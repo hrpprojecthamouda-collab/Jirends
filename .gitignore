@@ -48,6 +48,8 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+# Real env config (anon key + project URL). Template is env.example.dart.
+lib/core/env/env.dart
 
 # Generated code (freezed / json_serializable) — regenerated via build_runner
 *.g.dart

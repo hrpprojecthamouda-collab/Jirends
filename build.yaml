@@ -1,0 +1,15 @@
+# Global codegen config.
+#
+# Our Postgres columns are snake_case (avatar_url, created_by, event_type, ...);
+# our Dart fields are camelCase. Rename JSON keys to snake_case everywhere so
+# freezed/json_serializable models map straight onto Supabase rows without
+# per-field @JsonKey annotations.
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          field_rename: snake
+          # Be strict: fail the build if a row has a key we forgot to model,
+          # is off by default; keep defaults otherwise.
+          explicit_to_json: true
