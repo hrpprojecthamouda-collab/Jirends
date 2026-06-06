@@ -20,6 +20,16 @@
 
   "friendsTitle": "Ashab",
   "friendsComingSoon": "El-ashab jayin qrib — zid el-nas b el-handle mte3hom w abni el-grupe mte3ek.",
+  "friendsEmpty": "Mazel famma chay sahbek. Zid wa7ed b el-handle mte3ou bech tabni el-grupe mte3ek.",
+  "friendsAdd": "Zid sahbek",
+  "friendsAddByHandle": "Zid b el-handle",
+  "friendsHandleHint": "esm#tagline",
+  "friendsHandleLabel": "Handle",
+  "friendsAdded": "{handle} tzad l ashabek.",
+  "friendsRemove": "Na77i",
+  "friendsRemoveConfirm": "Na77i {handle} mn ashabek?",
+  "commonCancel": "Lghi",
+  "commonAdd": "Zid",
 
   "groupsTitle": "Groupat",
   "groupsComingSoon": "El-groupat jayin qrib — jma3 ashabek bech tzid grupe kamla l mnasba f marra.",

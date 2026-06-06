@@ -21,6 +21,18 @@
 
   "friendsTitle": "Friends",
   "friendsComingSoon": "Friends are coming soon — add people by their handle and build your crew.",
+  "friendsEmpty": "No friends yet. Add someone by their handle to build your crew.",
+  "friendsAdd": "Add friend",
+  "friendsAddByHandle": "Add by handle",
+  "friendsHandleHint": "nickname#tagline",
+  "friendsHandleLabel": "Handle",
+  "friendsAdded": "Added {handle} to your friends.",
+  "@friendsAdded": { "placeholders": { "handle": { "type": "String" } } },
+  "friendsRemove": "Remove",
+  "friendsRemoveConfirm": "Remove {handle} from your friends?",
+  "@friendsRemoveConfirm": { "placeholders": { "handle": { "type": "String" } } },
+  "commonCancel": "Cancel",
+  "commonAdd": "Add",
 
   "groupsTitle": "Groups",
   "groupsComingSoon": "Groups are coming soon — bundle friends so you can add a whole crew to an event at once.",

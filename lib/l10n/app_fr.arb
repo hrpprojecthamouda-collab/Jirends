@@ -19,6 +19,16 @@
 
   "friendsTitle": "Amis",
   "friendsComingSoon": "Les amis arrivent bientôt — ajoutez des gens par leur identifiant et constituez votre groupe.",
+  "friendsEmpty": "Aucun ami pour l’instant. Ajoutez quelqu’un par son identifiant pour constituer votre groupe.",
+  "friendsAdd": "Ajouter un ami",
+  "friendsAddByHandle": "Ajouter par identifiant",
+  "friendsHandleHint": "pseudo#signature",
+  "friendsHandleLabel": "Identifiant",
+  "friendsAdded": "{handle} a été ajouté à vos amis.",
+  "friendsRemove": "Retirer",
+  "friendsRemoveConfirm": "Retirer {handle} de vos amis ?",
+  "commonCancel": "Annuler",
+  "commonAdd": "Ajouter",
 
   "groupsTitle": "Groupes",
   "groupsComingSoon": "Les groupes arrivent bientôt — réunissez des amis pour ajouter tout un groupe à un événement d’un coup.",
