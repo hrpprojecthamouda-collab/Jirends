@@ -357,11 +357,19 @@ create policy profiles_insert_own on public.profiles
   for insert to authenticated with check (id = auth.uid());
 
 -- ── events ──────────────────────────────────────────────────────────────────
--- THE core policy. You see an event iff you are a member. The surprise target
--- has no member row, so this returns nothing for them.
+-- THE core policy. You see an event iff you are a member — OR you are its
+-- creator. The creator clause is required so that `INSERT ... RETURNING` works:
+-- the creator's organizer membership is added by an AFTER-INSERT trigger, which
+-- is not yet visible when RETURNING evaluates this SELECT check. It does NOT
+-- weaken the cardinal rule: the surprise target is never the creator (a guard
+-- trigger forbids making an existing member the target, and the creator is
+-- auto-added as a member), so `created_by = auth.uid()` can never match the
+-- target. The surprise target still has no member row and no creator match, so
+-- this returns nothing for them.
 drop policy if exists events_select_member on public.events;
 create policy events_select_member on public.events
-  for select to authenticated using (public.is_event_member(id));
+  for select to authenticated
+  using (public.is_event_member(id) or created_by = auth.uid());
 
 -- Anyone authenticated may create an event, but only as themselves.
 drop policy if exists events_insert_self on public.events;
