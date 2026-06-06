@@ -18,7 +18,9 @@ import '../features/auth/data/profile_repository.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
-import '../features/home/presentation/home_screen.dart';
+import '../features/events/presentation/events_list_screen.dart';
+import '../features/events/presentation/create_event_screen.dart';
+import '../features/events/presentation/event_detail_screen.dart';
 import '../features/home/presentation/splash_screen.dart';
 
 class AppRoutes {
@@ -26,6 +28,10 @@ class AppRoutes {
   static const signUp = '/sign-up';
   static const onboarding = '/onboarding';
   static const home = '/';
+  static const createEvent = '/events/new';
+
+  /// Detail route for one event. Path: /events/:id
+  static String eventDetail(String id) => '/events/$id';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -74,8 +80,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (profileAsync.isLoading && !profileAsync.hasValue) {
             return const SplashScreen();
           }
-          return const HomeScreen();
+          return const EventsListScreen();
         },
+      ),
+      GoRoute(
+        path: AppRoutes.createEvent,
+        builder: (context, state) => const CreateEventScreen(),
+      ),
+      GoRoute(
+        path: '/events/:id',
+        builder: (context, state) =>
+            EventDetailScreen(eventId: state.pathParameters['id']!),
       ),
       GoRoute(path: AppRoutes.signIn, builder: (context, state) => const SignInScreen()),
       GoRoute(path: AppRoutes.signUp, builder: (context, state) => const SignUpScreen()),

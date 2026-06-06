@@ -1,0 +1,217 @@
+/// Create an event — the minimal first version: title, type, description,
+/// optional date range and location. Status is set by the DB (the type's first
+/// phase); type-specific property fields and the surprise picker come in later
+/// slices. On success we pop back to the list, which updates live via the
+/// realtime stream.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../auth/application/auth_controller.dart';
+import '../application/event_list_controller.dart';
+import '../data/event.dart';
+
+class CreateEventScreen extends ConsumerStatefulWidget {
+  const CreateEventScreen({super.key});
+
+  @override
+  ConsumerState<CreateEventScreen> createState() => _CreateEventScreenState();
+}
+
+class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _title = TextEditingController();
+  final _description = TextEditingController();
+  final _location = TextEditingController();
+
+  EventType _type = EventType.trip;
+  DateTime? _startsAt;
+  DateTime? _endsAt;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    _location.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate({required bool isStart}) async {
+    final now = DateTime.now();
+    final initial = (isStart ? _startsAt : _endsAt) ?? _startsAt ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _startsAt = picked;
+        // Keep end >= start.
+        if (_endsAt != null && _endsAt!.isBefore(picked)) _endsAt = picked;
+      } else {
+        _endsAt = picked;
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    // Defensive: the DB enforces this too (events_time_order), but catch it
+    // before the round-trip.
+    if (_startsAt != null && _endsAt != null && _endsAt!.isBefore(_startsAt!)) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('End must be after start.')));
+      return;
+    }
+
+    final id = await ref.read(createEventControllerProvider.notifier).create(
+          title: _title.text.trim(),
+          eventType: _type,
+          description: _description.text.trim(),
+          startsAt: _startsAt,
+          endsAt: _endsAt,
+          location: _location.text.trim(),
+        );
+    if (id != null && mounted) context.pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(createEventControllerProvider);
+    final loading = state.isLoading;
+
+    ref.listen(createEventControllerProvider, (_, next) {
+      if (next.hasError && !next.isLoading) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(messageForError(next.error!))));
+      }
+    });
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('New event')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _title,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                  maxLength: 140,
+                  validator: (v) {
+                    final s = (v ?? '').trim();
+                    if (s.isEmpty) return 'Give it a title';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text('Type', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                SegmentedButton<EventType>(
+                  segments: EventType.values
+                      .map((t) => ButtonSegment(value: t, label: Text(t.label)))
+                      .toList(),
+                  selected: {_type},
+                  onSelectionChanged: loading
+                      ? null
+                      : (s) => setState(() => _type = s.first),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _description,
+                  textInputAction: TextInputAction.newline,
+                  minLines: 2,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DateField(
+                        label: 'Starts',
+                        value: _startsAt,
+                        onTap: loading ? null : () => _pickDate(isStart: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DateField(
+                        label: 'Ends',
+                        value: _endsAt,
+                        onTap: loading ? null : () => _pickDate(isStart: false),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _location,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                      labelText: 'Location (optional)',
+                      prefixIcon: Icon(Icons.place_outlined)),
+                  onFieldSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: loading ? null : _submit,
+                  child: loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Create event'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  const _DateField({required this.label, required this.value, required this.onTap});
+
+  final String label;
+  final DateTime? value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = value == null
+        ? 'Pick a date'
+        : '${value!.day.toString().padLeft(2, '0')}/'
+            '${value!.month.toString().padLeft(2, '0')}/${value!.year}';
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: const Icon(Icons.event_outlined),
+        ),
+        child: Text(text,
+            style: value == null
+                ? TextStyle(color: Theme.of(context).hintColor)
+                : null),
+      ),
+    );
+  }
+}
