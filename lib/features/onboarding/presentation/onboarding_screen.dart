@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../application/onboarding_controller.dart';
 import '../../auth/application/auth_controller.dart';
 
@@ -48,15 +49,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
-  String? _validatePart(String? v, String label) {
+  String? _validatePart(String? v, String label, AppLocalizations t) {
     final s = (v ?? '').trim();
-    if (s.length < 2 || s.length > 24) return '$label must be 2–24 characters';
-    if (s.contains('#')) return '$label cannot contain “#”';
+    if (s.length < 2 || s.length > 24) return t.onboardingPartLength(label);
+    if (s.contains('#')) return t.onboardingNoHash(label);
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final state = ref.watch(onboardingControllerProvider);
     final loading = state.isLoading;
     final nick = _nickname.text.trim();
@@ -75,7 +77,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose your handle'),
+        title: Text(t.onboardingTitle),
         actions: [
           IconButton(
             tooltip: 'Sign out',
@@ -93,8 +95,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Pick a nickname and a tagline. Together they form your unique '
-                  'handle — this is how friends add you.',
+                  t.onboardingExplain,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 20),
@@ -107,16 +108,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 TextFormField(
                   controller: _nickname,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Nickname', prefixText: ''),
-                  validator: (v) => _validatePart(v, 'Nickname'),
+                  decoration: InputDecoration(labelText: t.onboardingNickname, prefixText: ''),
+                  validator: (v) => _validatePart(v, t.onboardingNickname, t),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _tagline,
                   textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(labelText: 'Tagline', prefixText: '#'),
+                  decoration: InputDecoration(labelText: t.onboardingTagline, prefixText: '#'),
                   onFieldSubmitted: (_) => _submit(),
-                  validator: (v) => _validatePart(v, 'Tagline'),
+                  validator: (v) => _validatePart(v, t.onboardingTagline, t),
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
@@ -125,7 +126,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ? const SizedBox(
                           height: 20, width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Continue'),
+                      : Text(t.onboardingContinue),
                 ),
               ],
             ),

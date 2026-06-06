@@ -8,6 +8,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/event_list_controller.dart';
 import '../data/event.dart';
@@ -21,30 +23,30 @@ class EventDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final eventAsync = ref.watch(eventByIdProvider(eventId));
 
+    final t = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Event')),
+      appBar: AppBar(title: Text(t.eventsTitle)),
       body: eventAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text(messageForError(err))),
-        data: (event) =>
-            event == null ? const _NotFound() : _Detail(event: event),
+        data: (event) => event == null
+            ? _NotFound(message: t.eventsUnavailable)
+            : _Detail(event: event),
       ),
     );
   }
 }
 
 class _NotFound extends StatelessWidget {
-  const _NotFound();
+  const _NotFound({required this.message});
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Text(
-          'This event isn’t available.',
-          textAlign: TextAlign.center,
-        ),
+        padding: const EdgeInsets.all(24),
+        child: Text(message, textAlign: TextAlign.center),
       ),
     );
   }
@@ -54,24 +56,32 @@ class _Detail extends StatelessWidget {
   const _Detail({required this.event});
   final Event event;
 
+  String _typeLabel(AppLocalizations t) => switch (event.eventType) {
+        EventType.trip => t.eventTypeTrip,
+        EventType.dinner => t.eventTypeDinner,
+        EventType.birthday => t.eventTypeBirthday,
+        EventType.meetup => t.eventTypeMeetup,
+      };
+
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
         Text(event.title, style: textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Text('${event.eventType.label}'
+        Text('${_typeLabel(t)}'
             '${event.status != null ? ' • ${event.status}' : ''}'),
         if (event.isSurprise) ...[
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.visibility_off_outlined,
-                  size: 18, color: Theme.of(context).colorScheme.tertiary),
+              const Icon(Icons.visibility_off_outlined,
+                  size: 18, color: AppColors.yellow),
               const SizedBox(width: 6),
-              const Text('Surprise — hidden from its target'),
+              Text(t.eventsSurpriseBadge),
             ],
           ),
         ],
@@ -79,11 +89,6 @@ class _Detail extends StatelessWidget {
           const SizedBox(height: 16),
           Text(event.description!),
         ],
-        const SizedBox(height: 24),
-        Text(
-          'Members, items, comments and the rest land in the next slice.',
-          style: textTheme.bodySmall,
-        ),
       ],
     );
   }

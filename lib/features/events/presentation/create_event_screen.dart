@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/event_list_controller.dart';
 import '../data/event.dart';
@@ -66,7 +67,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     if (_startsAt != null && _endsAt != null && _endsAt!.isBefore(_startsAt!)) {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('End must be after start.')));
+        ..showSnackBar(SnackBar(
+            content: Text(AppLocalizations.of(context).createEndBeforeStart)));
       return;
     }
 
@@ -94,8 +96,16 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       }
     });
 
+    final t = AppLocalizations.of(context);
+    String typeLabel(EventType type) => switch (type) {
+          EventType.trip => t.eventTypeTrip,
+          EventType.dinner => t.eventTypeDinner,
+          EventType.birthday => t.eventTypeBirthday,
+          EventType.meetup => t.eventTypeMeetup,
+        };
+
     return Scaffold(
-      appBar: AppBar(title: const Text('New event')),
+      appBar: AppBar(title: Text(t.createTitle)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -107,20 +117,22 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 TextFormField(
                   controller: _title,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Title'),
+                  decoration: InputDecoration(labelText: t.createFieldTitle),
                   maxLength: 140,
                   validator: (v) {
                     final s = (v ?? '').trim();
-                    if (s.isEmpty) return 'Give it a title';
+                    if (s.isEmpty) return t.createNeedTitle;
                     return null;
                   },
                 ),
                 const SizedBox(height: 8),
-                Text('Type', style: Theme.of(context).textTheme.labelLarge),
+                Text(t.createFieldType,
+                    style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
                 SegmentedButton<EventType>(
                   segments: EventType.values
-                      .map((t) => ButtonSegment(value: t, label: Text(t.label)))
+                      .map((type) =>
+                          ButtonSegment(value: type, label: Text(typeLabel(type))))
                       .toList(),
                   selected: {_type},
                   onSelectionChanged: loading
@@ -133,8 +145,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                   textInputAction: TextInputAction.newline,
                   minLines: 2,
                   maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
+                  decoration: InputDecoration(
+                    labelText: t.createFieldDescription,
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -143,7 +155,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                   children: [
                     Expanded(
                       child: _DateField(
-                        label: 'Starts',
+                        label: t.createFieldStarts,
+                        emptyText: t.createPickDate,
                         value: _startsAt,
                         onTap: loading ? null : () => _pickDate(isStart: true),
                       ),
@@ -151,7 +164,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _DateField(
-                        label: 'Ends',
+                        label: t.createFieldEnds,
+                        emptyText: t.createPickDate,
                         value: _endsAt,
                         onTap: loading ? null : () => _pickDate(isStart: false),
                       ),
@@ -162,9 +176,9 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 TextFormField(
                   controller: _location,
                   textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(
-                      labelText: 'Location (optional)',
-                      prefixIcon: Icon(Icons.place_outlined)),
+                  decoration: InputDecoration(
+                      labelText: t.createFieldLocation,
+                      prefixIcon: const Icon(Icons.place_outlined)),
                   onFieldSubmitted: (_) => _submit(),
                 ),
                 const SizedBox(height: 24),
@@ -175,7 +189,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Create event'),
+                      : Text(t.createSubmit),
                 ),
               ],
             ),
@@ -187,16 +201,22 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 }
 
 class _DateField extends StatelessWidget {
-  const _DateField({required this.label, required this.value, required this.onTap});
+  const _DateField({
+    required this.label,
+    required this.emptyText,
+    required this.value,
+    required this.onTap,
+  });
 
   final String label;
+  final String emptyText;
   final DateTime? value;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final text = value == null
-        ? 'Pick a date'
+        ? emptyText
         : '${value!.day.toString().padLeft(2, '0')}/'
             '${value!.month.toString().padLeft(2, '0')}/${value!.year}';
     return InkWell(

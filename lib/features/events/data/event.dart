@@ -20,15 +20,7 @@ enum EventType {
   trip,
   dinner,
   birthday,
-  meetup;
-
-  /// Title-cased label for display.
-  String get label => switch (this) {
-        EventType.trip => 'Trip',
-        EventType.dinner => 'Dinner',
-        EventType.birthday => 'Birthday',
-        EventType.meetup => 'Meetup',
-      };
+  meetup,
 }
 
 @freezed

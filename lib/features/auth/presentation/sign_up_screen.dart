@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../application/auth_controller.dart';
 
@@ -34,8 +35,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     if (outcome == SignUpOutcome.needsEmailConfirmation) {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(const SnackBar(
-          content: Text('Check your email to confirm your account, then sign in.'),
+        ..showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).authCheckEmail),
         ));
       context.go(AppRoutes.signIn);
     }
@@ -44,6 +45,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final state = ref.watch(authControllerProvider);
     final loading = state.isLoading;
 
@@ -67,7 +69,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Create your account',
+                  Text(t.authCreateTitle,
                       style: Theme.of(context).textTheme.headlineMedium,
                       textAlign: TextAlign.center),
                   const SizedBox(height: 24),
@@ -75,20 +77,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: InputDecoration(labelText: t.authEmail),
                     validator: (v) =>
-                        (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                        (v == null || !v.contains('@')) ? t.authInvalidEmail : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _password,
                     obscureText: true,
                     autofillHints: const [AutofillHints.newPassword],
-                    decoration: const InputDecoration(labelText: 'Password'),
+                    decoration: InputDecoration(labelText: t.authPassword),
                     onFieldSubmitted: (_) => _submit(),
-                    validator: (v) => (v == null || v.length < 6)
-                        ? 'At least 6 characters'
-                        : null,
+                    validator: (v) =>
+                        (v == null || v.length < 6) ? t.authPasswordTooShort : null,
                   ),
                   const SizedBox(height: 24),
                   FilledButton(
@@ -97,12 +98,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         ? const SizedBox(
                             height: 20, width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Sign up'),
+                        : Text(t.authSignIn),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: loading ? null : () => context.go(AppRoutes.signIn),
-                    child: const Text('Already have an account? Sign in'),
+                    child: Text(t.authHaveAccount),
                   ),
                 ],
               ),

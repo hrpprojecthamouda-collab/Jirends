@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../application/auth_controller.dart';
 
@@ -35,6 +36,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final state = ref.watch(authControllerProvider);
     final loading = state.isLoading;
 
@@ -58,7 +60,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Welcome back',
+                  Text(t.authWelcomeBack,
                       style: Theme.of(context).textTheme.headlineMedium,
                       textAlign: TextAlign.center),
                   const SizedBox(height: 24),
@@ -66,19 +68,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: InputDecoration(labelText: t.authEmail),
                     validator: (v) =>
-                        (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                        (v == null || !v.contains('@')) ? t.authInvalidEmail : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _password,
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
-                    decoration: const InputDecoration(labelText: 'Password'),
+                    decoration: InputDecoration(labelText: t.authPassword),
                     onFieldSubmitted: (_) => _submit(),
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Enter your password' : null,
+                        (v == null || v.isEmpty) ? t.authEnterPassword : null,
                   ),
                   const SizedBox(height: 24),
                   FilledButton(
@@ -87,12 +89,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                         ? const SizedBox(
                             height: 20, width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Sign in'),
+                        : Text(t.authSignIn),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: loading ? null : () => context.go(AppRoutes.signUp),
-                    child: const Text("New here? Create an account"),
+                    child: Text(t.authCreateAccount),
                   ),
                 ],
               ),

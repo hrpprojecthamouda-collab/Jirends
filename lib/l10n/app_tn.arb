@@ -1,0 +1,75 @@
+{
+  "@@locale": "tn",
+  "@@x-note": "Tunisian (Derja) in Latin script, LTR. FIRST PASS — the user will refine these words. Brand 'Jirends' left untranslated.",
+
+  "appTitle": "Jirends",
+
+  "navHome": "Dar",
+  "navEvents": "Mnasbat",
+  "navFriends": "Ashab",
+  "navGroups": "Groupat",
+  "navSettings": "Réglages",
+
+  "languageName": "Tounsi",
+
+  "settingsLanguage": "Lougha",
+  "settingsSignOut": "Khrouj",
+
+  "homeTitle": "Dar",
+  "homeActivityEmpty": "Mazel famma chay jdid. Ki ashabek yjawbou wala ykommntiw wala yaakhdhou haja fi mnasbatek, bech tlqahom houni.",
+
+  "friendsTitle": "Ashab",
+  "friendsComingSoon": "El-ashab jayin qrib — zid el-nas b el-handle mte3hom w abni el-grupe mte3ek.",
+
+  "groupsTitle": "Groupat",
+  "groupsComingSoon": "El-groupat jayin qrib — jma3 ashabek bech tzid grupe kamla l mnasba f marra.",
+
+  "authWelcomeBack": "Marhba bik mrigl",
+  "authEmail": "Email",
+  "authPassword": "Mot de passe",
+  "authSignIn": "Dkhoul",
+  "authCreateAccount": "Jdid houni ? A3mel compte",
+  "authCreateTitle": "A3mel el-compte mte3ek",
+  "authHaveAccount": "3andek compte deja ? Dkhoul",
+  "authInvalidEmail": "Ekteb email s7i7",
+  "authEnterPassword": "Ekteb el-mot de passe mte3ek",
+  "authPasswordTooShort": "3al aqal 6 7rouf",
+  "authCheckEmail": "Cheyek email mte3ek bech tʼakkad el-compte, baad dkhoul.",
+
+  "onboardingTitle": "Ekhtar el-handle mte3ek",
+  "onboardingExplain": "Ekhtar esm w tagline. El-zouz yamlou el-handle mte3ek el-wahid — hakka ashabek yzidouk.",
+  "onboardingNickname": "Esm",
+  "onboardingTagline": "Tagline",
+  "onboardingContinue": "Kammel",
+  "onboardingPartLength": "{label} lazem ykoun bin 2 w 24 7arf",
+  "onboardingNoHash": "{label} mayanjamch ykoun fih « # »",
+
+  "eventsTitle": "Mnasbat",
+  "eventsViewList": "Lista",
+  "eventsViewAgenda": "Agenda",
+  "eventsEmpty": "Mazel famma chay mnasba. Lammes « Mnasba jdida » bech tnaddhem voyage, ftour, 3id wala lqa m3a ashabek.",
+  "eventsNew": "Mnasba jdida",
+  "eventsAgendaComingSoon": "El-vue calendrier jaya qrib.",
+  "eventsUnavailable": "El-mnasba hethi mech mawjouda.",
+  "eventsSurpriseBadge": "Surprise — mkhabbya 3al cible mte3ha",
+
+  "eventTypeTrip": "Voyage",
+  "eventTypeDinner": "Ftour",
+  "eventTypeBirthday": "3id milad",
+  "eventTypeMeetup": "Lqa",
+
+  "createTitle": "Mnasba jdida",
+  "createFieldTitle": "3onwan",
+  "createFieldType": "Naw3",
+  "createFieldDescription": "Wasf (ikhtiyari)",
+  "createFieldStarts": "Ybda",
+  "createFieldEnds": "Yekmel",
+  "createFieldLocation": "Blasa (ikhtiyari)",
+  "createPickDate": "Ekhtar date",
+  "createSubmit": "A3mel el-mناsba",
+  "createNeedTitle": "Aatih 3onwan",
+  "createEndBeforeStart": "El-nihaya lazem baad el-bidaya.",
+
+  "commonRetry": "3awed",
+  "commonSomethingWrong": "Famma mochkla."
+}

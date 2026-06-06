@@ -1,72 +1,138 @@
-/// Events list — the home screen's real body. Renders whatever
-/// [eventListProvider] returns; it does NOT decide what is visible (that is the
-/// database's job). Loading and error states are handled here, never swallowed.
+/// Events — the Events branch of the app shell. Hosts a List / Agenda toggle.
+/// Renders whatever [eventListProvider] returns; it does NOT decide what is
+/// visible (that is the database's job). Loading and error states are handled
+/// here, never swallowed.
+///
+/// The Agenda view is a stub in this slice (a calendar grid lands later). Note
+/// for that work: the agenda must show only the user's visible events and must
+/// never become a free/busy overlay that leaks a hidden event's time.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../auth/application/auth_controller.dart';
-import '../../auth/data/profile_repository.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
+import '../../auth/application/auth_controller.dart';
 import '../application/event_list_controller.dart';
 import 'widgets/event_card.dart';
 
-class EventsListScreen extends ConsumerWidget {
+enum _EventsView { list, agenda }
+
+class EventsListScreen extends ConsumerStatefulWidget {
   const EventsListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EventsListScreen> createState() => _EventsListScreenState();
+}
+
+class _EventsListScreenState extends ConsumerState<EventsListScreen> {
+  _EventsView _view = _EventsView.list;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final eventsAsync = ref.watch(eventListProvider);
-    final handle = ref.watch(myProfileProvider).value?.handle ?? '…';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Jirends'),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
+        title: Text(t.eventsTitle),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SegmentedButton<_EventsView>(
+                segments: [
+                  ButtonSegment(
+                    value: _EventsView.list,
+                    icon: const Icon(Icons.view_list_outlined),
+                    label: Text(t.eventsViewList),
+                  ),
+                  ButtonSegment(
+                    value: _EventsView.agenda,
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: Text(t.eventsViewAgenda),
+                  ),
+                ],
+                selected: {_view},
+                onSelectionChanged: (s) => setState(() => _view = s.first),
+              ),
+            ),
           ),
-        ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push(AppRoutes.createEvent),
         icon: const Icon(Icons.add),
-        label: const Text('New event'),
+        label: Text(t.eventsNew),
       ),
-      body: eventsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _ErrorView(
-          message: messageForError(err),
-          onRetry: () => ref.invalidate(eventListProvider),
+      body: switch (_view) {
+        _EventsView.agenda => _AgendaStub(message: t.eventsAgendaComingSoon),
+        _EventsView.list => eventsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => _ErrorView(
+              message: messageForError(err),
+              retryLabel: t.commonRetry,
+              onRetry: () => ref.invalidate(eventListProvider),
+            ),
+            data: (events) => events.isEmpty
+                ? _EmptyView(message: t.eventsEmpty)
+                : RefreshIndicator(
+                    onRefresh: () async => ref.invalidate(eventListProvider),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                      itemCount: events.length,
+                      itemBuilder: (context, i) {
+                        final event = events[i];
+                        return EventCard(
+                          event: event,
+                          onTap: () =>
+                              context.push(AppRoutes.eventDetail(event.id)),
+                        );
+                      },
+                    ),
+                  ),
+          ),
+      },
+    );
+  }
+}
+
+class _AgendaStub extends StatelessWidget {
+  const _AgendaStub({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_month_outlined,
+                size: 56, color: AppColors.violet),
+            const SizedBox(height: 16),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: AppColors.inkMuted)),
+          ],
         ),
-        data: (events) => events.isEmpty
-            ? _EmptyView(handle: handle)
-            : RefreshIndicator(
-                onRefresh: () async => ref.invalidate(eventListProvider),
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                  itemCount: events.length,
-                  itemBuilder: (context, i) {
-                    final event = events[i];
-                    return EventCard(
-                      event: event,
-                      onTap: () => context.push(AppRoutes.eventDetail(event.id)),
-                    );
-                  },
-                ),
-              ),
       ),
     );
   }
 }
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView({required this.handle});
-  final String handle;
+  const _EmptyView({required this.message});
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -76,18 +142,12 @@ class _EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.celebration_outlined, size: 64),
+            const Icon(Icons.celebration_outlined,
+                size: 64, color: AppColors.violet),
             const SizedBox(height: 16),
-            Text('Welcome, $handle',
-                style: Theme.of(context).textTheme.headlineSmall,
+            Text(message,
+                style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text(
-              'No events yet. Tap “New event” to plan a trip, dinner, '
-              'birthday, or meetup with friends.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),
@@ -96,8 +156,13 @@ class _EmptyView extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
+  const _ErrorView({
+    required this.message,
+    required this.retryLabel,
+    required this.onRetry,
+  });
   final String message;
+  final String retryLabel;
   final VoidCallback onRetry;
 
   @override
@@ -113,7 +178,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton.tonal(onPressed: onRetry, child: Text(retryLabel)),
           ],
         ),
       ),

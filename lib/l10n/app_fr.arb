@@ -1,0 +1,74 @@
+{
+  "@@locale": "fr",
+
+  "appTitle": "Jirends",
+
+  "navHome": "Accueil",
+  "navEvents": "Événements",
+  "navFriends": "Amis",
+  "navGroups": "Groupes",
+  "navSettings": "Réglages",
+
+  "languageName": "Français",
+
+  "settingsLanguage": "Langue",
+  "settingsSignOut": "Se déconnecter",
+
+  "homeTitle": "Accueil",
+  "homeActivityEmpty": "Aucune activité récente. Quand vos amis répondent, commentent ou prennent en charge des tâches sur vos événements, vous le verrez ici.",
+
+  "friendsTitle": "Amis",
+  "friendsComingSoon": "Les amis arrivent bientôt — ajoutez des gens par leur identifiant et constituez votre groupe.",
+
+  "groupsTitle": "Groupes",
+  "groupsComingSoon": "Les groupes arrivent bientôt — réunissez des amis pour ajouter tout un groupe à un événement d’un coup.",
+
+  "authWelcomeBack": "Bon retour",
+  "authEmail": "E-mail",
+  "authPassword": "Mot de passe",
+  "authSignIn": "Se connecter",
+  "authCreateAccount": "Nouveau ici ? Créer un compte",
+  "authCreateTitle": "Créez votre compte",
+  "authHaveAccount": "Vous avez déjà un compte ? Se connecter",
+  "authInvalidEmail": "Saisissez un e-mail valide",
+  "authEnterPassword": "Saisissez votre mot de passe",
+  "authPasswordTooShort": "Au moins 6 caractères",
+  "authCheckEmail": "Vérifiez votre e-mail pour confirmer votre compte, puis connectez-vous.",
+
+  "onboardingTitle": "Choisissez votre identifiant",
+  "onboardingExplain": "Choisissez un pseudo et une signature. Ensemble, ils forment votre identifiant unique — c’est ainsi que vos amis vous ajoutent.",
+  "onboardingNickname": "Pseudo",
+  "onboardingTagline": "Signature",
+  "onboardingContinue": "Continuer",
+  "onboardingPartLength": "{label} doit comporter 2 à 24 caractères",
+  "onboardingNoHash": "{label} ne peut pas contenir « # »",
+
+  "eventsTitle": "Événements",
+  "eventsViewList": "Liste",
+  "eventsViewAgenda": "Agenda",
+  "eventsEmpty": "Aucun événement. Touchez « Nouvel événement » pour planifier un voyage, un dîner, un anniversaire ou une rencontre entre amis.",
+  "eventsNew": "Nouvel événement",
+  "eventsAgendaComingSoon": "La vue calendrier arrive bientôt.",
+  "eventsUnavailable": "Cet événement n’est pas disponible.",
+  "eventsSurpriseBadge": "Surprise — caché à la personne concernée",
+
+  "eventTypeTrip": "Voyage",
+  "eventTypeDinner": "Dîner",
+  "eventTypeBirthday": "Anniversaire",
+  "eventTypeMeetup": "Rencontre",
+
+  "createTitle": "Nouvel événement",
+  "createFieldTitle": "Titre",
+  "createFieldType": "Type",
+  "createFieldDescription": "Description (facultatif)",
+  "createFieldStarts": "Début",
+  "createFieldEnds": "Fin",
+  "createFieldLocation": "Lieu (facultatif)",
+  "createPickDate": "Choisir une date",
+  "createSubmit": "Créer l’événement",
+  "createNeedTitle": "Donnez-lui un titre",
+  "createEndBeforeStart": "La fin doit être après le début.",
+
+  "commonRetry": "Réessayer",
+  "commonSomethingWrong": "Une erreur s’est produite."
+}

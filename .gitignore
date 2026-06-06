@@ -54,3 +54,7 @@ lib/core/env/env.dart
 # Generated code (freezed / json_serializable) — regenerated via build_runner
 *.g.dart
 *.freezed.dart
+
+# Generated localizations (flutter gen-l10n from lib/l10n/*.arb). The ARB files
+# are the source of truth and ARE tracked; the generated Dart is not.
+lib/l10n/app_localizations*.dart

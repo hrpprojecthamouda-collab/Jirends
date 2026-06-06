@@ -1,0 +1,78 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Jirends",
+  "@appTitle": { "description": "App name (brand, usually not translated)." },
+
+  "navHome": "Home",
+  "navEvents": "Events",
+  "navFriends": "Friends",
+  "navGroups": "Groups",
+  "navSettings": "Settings",
+
+  "languageName": "English",
+  "@languageName": { "description": "This language's own name, shown in the picker." },
+
+  "settingsLanguage": "Language",
+  "settingsSignOut": "Sign out",
+
+  "homeTitle": "Home",
+  "homeActivityEmpty": "No recent activity yet. When friends RSVP, comment, or claim items on your events, you'll see it here.",
+
+  "friendsTitle": "Friends",
+  "friendsComingSoon": "Friends are coming soon — add people by their handle and build your crew.",
+
+  "groupsTitle": "Groups",
+  "groupsComingSoon": "Groups are coming soon — bundle friends so you can add a whole crew to an event at once.",
+
+  "authWelcomeBack": "Welcome back",
+  "authEmail": "Email",
+  "authPassword": "Password",
+  "authSignIn": "Sign in",
+  "authCreateAccount": "New here? Create an account",
+  "authCreateTitle": "Create your account",
+  "authHaveAccount": "Already have an account? Sign in",
+  "authInvalidEmail": "Enter a valid email",
+  "authEnterPassword": "Enter your password",
+  "authPasswordTooShort": "At least 6 characters",
+  "authCheckEmail": "Check your email to confirm your account, then sign in.",
+
+  "onboardingTitle": "Choose your handle",
+  "onboardingExplain": "Pick a nickname and a tagline. Together they form your unique handle — this is how friends add you.",
+  "onboardingNickname": "Nickname",
+  "onboardingTagline": "Tagline",
+  "onboardingContinue": "Continue",
+  "onboardingPartLength": "{label} must be 2–24 characters",
+  "@onboardingPartLength": { "placeholders": { "label": { "type": "String" } } },
+  "onboardingNoHash": "{label} cannot contain “#”",
+  "@onboardingNoHash": { "placeholders": { "label": { "type": "String" } } },
+
+  "eventsTitle": "Events",
+  "eventsViewList": "List",
+  "eventsViewAgenda": "Agenda",
+  "eventsEmpty": "No events yet. Tap “New event” to plan a trip, dinner, birthday, or meetup with friends.",
+  "eventsNew": "New event",
+  "eventsAgendaComingSoon": "The calendar view is coming soon.",
+  "eventsUnavailable": "This event isn’t available.",
+  "eventsSurpriseBadge": "Surprise — hidden from its target",
+
+  "eventTypeTrip": "Trip",
+  "eventTypeDinner": "Dinner",
+  "eventTypeBirthday": "Birthday",
+  "eventTypeMeetup": "Meetup",
+
+  "createTitle": "New event",
+  "createFieldTitle": "Title",
+  "createFieldType": "Type",
+  "createFieldDescription": "Description (optional)",
+  "createFieldStarts": "Starts",
+  "createFieldEnds": "Ends",
+  "createFieldLocation": "Location (optional)",
+  "createPickDate": "Pick a date",
+  "createSubmit": "Create event",
+  "createNeedTitle": "Give it a title",
+  "createEndBeforeStart": "End must be after start.",
+
+  "commonRetry": "Retry",
+  "commonSomethingWrong": "Something went wrong."
+}
