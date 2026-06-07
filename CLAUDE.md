@@ -123,5 +123,6 @@ flutter test
 flutter run                                                  # device/emulator
 ```
 
-Backend: apply `schema.sql` in the Supabase SQL editor, then run `rls_tests.sql`
-to confirm the visibility model holds.
+Backend: apply `schema.sql`, then `social_layer.sql`, `event_types.sql`, and
+`crews.sql` (shared/visible "crew" groups — Type 2) in the Supabase SQL editor,
+then run `rls_tests.sql` to confirm the visibility model holds.

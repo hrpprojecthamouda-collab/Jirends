@@ -25,7 +25,7 @@ declare
   dave  uuid := '44444444-4444-4444-4444-444444444444';  -- the surprise target
   stranger uuid := '55555555-5555-5555-5555-555555555555';
   clash uuid := '99999999-9999-9999-9999-999999999999';
-  ev uuid; ev_trip uuid; ev_dinner uuid; grp uuid;
+  ev uuid; ev_trip uuid; ev_dinner uuid; grp uuid; crew uuid; ev_crew uuid;
   n int; res uuid; ok boolean; added int;
 begin
   -- Impersonation is done inline with set_config(...,true): each call sets the
@@ -196,6 +196,52 @@ begin
   begin insert into public.event_type_phases(event_type,key,label,position) values ('trip','hacked','Hacked',99);
   exception when others then ok := true; end;
   if not ok then raise exception '❌ ASSERTION FAILED: users must not write phase config'; end if;
+
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 9 — CREWS (Type 2: shared, visible groups). Distinct from friend_groups
+  -- (Type 1, owner-private). Every member sees the roster; only the owner writes;
+  -- and — the cardinal part — being in a crew with someone leaks NOTHING about
+  -- their events. A surprise for a crew member stays invisible to that member.
+  -- ════════════════════════════════════════════════════════════════════════
+  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+  insert into public.crews (owner_id,name) values (alice,'Roommates') returning id into crew;
+  insert into public.crew_members (crew_id,user_id,added_by) values (crew,bob,alice);
+  insert into public.crew_members (crew_id,user_id,added_by) values (crew,dave,alice);
+
+  -- Member Bob can read the crew AND the full roster (sees Dave) — defining Type-2 trait.
+  perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+  select count(*) into n from public.crews where id=crew;
+  if n <> 1 then raise exception '❌ ASSERTION FAILED: crew member Bob must be able to read the crew'; end if;
+  select count(*) into n from public.crew_members where crew_id=crew;
+  if n <> 2 then raise exception '❌ ASSERTION FAILED: crew member Bob must see the full roster (expected 2, got %)', n; end if;
+
+  -- Stranger (not a member) sees neither the crew nor its roster.
+  perform set_config('request.jwt.claims', json_build_object('sub',stranger::text,'role','authenticated')::text, true);
+  select count(*) into n from public.crews where id=crew;
+  if n <> 0 then raise exception '❌ ASSERTION FAILED: non-member must not read the crew'; end if;
+  select count(*) into n from public.crew_members where crew_id=crew;
+  if n <> 0 then raise exception '❌ ASSERTION FAILED: non-member must not read the crew roster'; end if;
+
+  -- Non-owner member Bob cannot add or remove crew members (owner-only writes).
+  ok := false;
+  begin insert into public.crew_members (crew_id,user_id,added_by) values (crew,carol,bob);
+  exception when others then ok := true; end;
+  if not ok then raise exception '❌ ASSERTION FAILED: non-owner must not add crew members'; end if;
+
+  -- CARDINAL: a surprise event for Dave, then expand the crew onto it. The
+  -- per-row surprise guard must SKIP Dave, and Dave must still see nothing.
+  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+  insert into public.events (title,event_type,surprise_target,created_by)
+  values ('Daves Surprise (crew)','birthday',dave,alice) returning id into ev_crew;
+  added := public.assign_crew_to_event(crew, ev_crew);   -- Bob added; Dave skipped by guard
+  if added <> 1 then raise exception '❌ CARDINAL: crew expansion must add only Bob, not the target Dave (got %)', added; end if;
+  if exists (select 1 from public.event_members where event_id=ev_crew and user_id=dave) then
+    raise exception '❌ CARDINAL: the surprise target must NOT become an event member via crew expansion'; end if;
+
+  -- Dave is in the crew WITH Alice, yet sees nothing of Alice''s surprise for him.
+  perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+  select count(*) into n from public.events where id=ev_crew;
+  if n <> 0 then raise exception '❌ CARDINAL: crew co-membership must not expose a surprise to its target'; end if;
 
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);

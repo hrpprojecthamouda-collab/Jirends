@@ -151,5 +151,6 @@ flutter test
 flutter run
 ```
 
-Backend: apply `schema.sql`, then `social_layer.sql`, then `event_types.sql` in
-the Supabase SQL editor, then run `rls_tests.sql` to confirm the model holds.
+Backend: apply `schema.sql`, then `social_layer.sql`, `event_types.sql`, then
+`crews.sql` (shared/visible "crew" groups — Type 2) in the Supabase SQL editor,
+then run `rls_tests.sql` to confirm the model holds.
