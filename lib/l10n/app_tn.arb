@@ -84,6 +84,7 @@
   "eventsEmpty": "Mazel famma chay mnasba. Lammes « Mnasba jdida » bech tnaddhem voyage, ftour, 3id wala lqa m3a ashabek.",
   "eventsNew": "Mnasba jdida",
   "eventsAgendaComingSoon": "El-vue calendrier jaya qrib.",
+  "agendaNoEventsOnDay": "Famma chay mnasba el-nhar hetha.",
   "eventsUnavailable": "El-mnasba hethi mech mawjouda.",
   "eventsSurpriseBadge": "Surprise — mkhabbya 3al cible mte3ha",
 

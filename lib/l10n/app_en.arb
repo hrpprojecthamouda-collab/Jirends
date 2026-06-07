@@ -92,6 +92,7 @@
   "eventsEmpty": "No events yet. Tap “New event” to plan a trip, dinner, birthday, or meetup with friends.",
   "eventsNew": "New event",
   "eventsAgendaComingSoon": "The calendar view is coming soon.",
+  "agendaNoEventsOnDay": "No events on this day.",
   "eventsUnavailable": "This event isn’t available.",
   "eventsSurpriseBadge": "Surprise — hidden from its target",
 

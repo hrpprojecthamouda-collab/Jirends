@@ -3,9 +3,9 @@
 /// visible (that is the database's job). Loading and error states are handled
 /// here, never swallowed.
 ///
-/// The Agenda view is a stub in this slice (a calendar grid lands later). Note
-/// for that work: the agenda must show only the user's visible events and must
-/// never become a free/busy overlay that leaks a hidden event's time.
+/// Both views read the same RLS-scoped event list. The Agenda must never become
+/// a free/busy overlay that leaks a hidden event's time — it only ever shows
+/// the user's own visible events on their days.
 library;
 
 import 'package:flutter/material.dart';
@@ -17,6 +17,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/event_list_controller.dart';
+import 'widgets/agenda_view.dart';
 import 'widgets/event_card.dart';
 
 enum _EventsView { list, agenda }
@@ -70,61 +71,36 @@ class _EventsListScreenState extends ConsumerState<EventsListScreen> {
         icon: const Icon(Icons.add),
         label: Text(t.eventsNew),
       ),
-      body: switch (_view) {
-        _EventsView.agenda => _AgendaStub(message: t.eventsAgendaComingSoon),
-        _EventsView.list => eventsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => _ErrorView(
-              message: messageForError(err),
-              retryLabel: t.commonRetry,
-              onRetry: () => ref.invalidate(eventListProvider),
-            ),
-            data: (events) => events.isEmpty
-                ? _EmptyView(message: t.eventsEmpty)
-                : RefreshIndicator(
-                    onRefresh: () async => ref.invalidate(eventListProvider),
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                      itemCount: events.length,
-                      itemBuilder: (context, i) {
-                        final event = events[i];
-                        return EventCard(
-                          event: event,
-                          onTap: () =>
-                              context.push(AppRoutes.eventDetail(event.id)),
-                        );
-                      },
-                    ),
-                  ),
-          ),
-      },
-    );
-  }
-}
-
-class _AgendaStub extends StatelessWidget {
-  const _AgendaStub({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.calendar_month_outlined,
-                size: 56, color: AppColors.violet),
-            const SizedBox(height: 16),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppColors.inkMuted)),
-          ],
+      body: eventsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => _ErrorView(
+          message: messageForError(err),
+          retryLabel: t.commonRetry,
+          onRetry: () => ref.invalidate(eventListProvider),
         ),
+        data: (events) => switch (_view) {
+          _EventsView.agenda => AgendaView(
+              events: events,
+              onOpenEvent: (e) => context.push(AppRoutes.eventDetail(e.id)),
+            ),
+          _EventsView.list => events.isEmpty
+              ? _EmptyView(message: t.eventsEmpty)
+              : RefreshIndicator(
+                  onRefresh: () async => ref.invalidate(eventListProvider),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                    itemCount: events.length,
+                    itemBuilder: (context, i) {
+                      final event = events[i];
+                      return EventCard(
+                        event: event,
+                        onTap: () =>
+                            context.push(AppRoutes.eventDetail(event.id)),
+                      );
+                    },
+                  ),
+                ),
+        },
       ),
     );
   }

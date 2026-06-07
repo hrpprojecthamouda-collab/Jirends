@@ -83,6 +83,7 @@
   "eventsEmpty": "Aucun événement. Touchez « Nouvel événement » pour planifier un voyage, un dîner, un anniversaire ou une rencontre entre amis.",
   "eventsNew": "Nouvel événement",
   "eventsAgendaComingSoon": "La vue calendrier arrive bientôt.",
+  "agendaNoEventsOnDay": "Aucun événement ce jour-là.",
   "eventsUnavailable": "Cet événement n’est pas disponible.",
   "eventsSurpriseBadge": "Surprise — caché à la personne concernée",
 
