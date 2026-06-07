@@ -17,7 +17,12 @@
   "settingsSignOut": "Sign out",
 
   "homeTitle": "Home",
-  "homeActivityEmpty": "No recent activity yet. When friends RSVP, comment, or claim items on your events, you'll see it here.",
+  "homeActivityEmpty": "No recent activity yet. When friends comment or add items on your events, you'll see it here.",
+  "activityComment": "{who} commented on {event}",
+  "@activityComment": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } },
+  "activityItem": "New item on {event}",
+  "@activityItem": { "placeholders": { "event": { "type": "String" } } },
+  "activitySomeone": "Someone",
 
   "friendsTitle": "Friends",
   "friendsComingSoon": "Friends are coming soon — add people by their handle and build your crew.",

@@ -15,7 +15,10 @@
   "settingsSignOut": "Se déconnecter",
 
   "homeTitle": "Accueil",
-  "homeActivityEmpty": "Aucune activité récente. Quand vos amis répondent, commentent ou prennent en charge des tâches sur vos événements, vous le verrez ici.",
+  "homeActivityEmpty": "Aucune activité récente. Quand vos amis commentent ou ajoutent des tâches à vos événements, vous le verrez ici.",
+  "activityComment": "{who} a commenté {event}",
+  "activityItem": "Nouvelle tâche sur {event}",
+  "activitySomeone": "Quelqu’un",
 
   "friendsTitle": "Amis",
   "friendsComingSoon": "Les amis arrivent bientôt — ajoutez des gens par leur identifiant et constituez votre groupe.",

@@ -16,7 +16,10 @@
   "settingsSignOut": "Khrouj",
 
   "homeTitle": "Dar",
-  "homeActivityEmpty": "Mazel famma chay jdid. Ki ashabek yjawbou wala ykommntiw wala yaakhdhou haja fi mnasbatek, bech tlqahom houni.",
+  "homeActivityEmpty": "Mazel famma chay jdid. Ki ashabek ykommntiw wala yzidou mahem fi mnasbatek, bech tlqahom houni.",
+  "activityComment": "{who} kommnta 3la {event}",
+  "activityItem": "Mohem jdid fi {event}",
+  "activitySomeone": "Wa7ed",
 
   "friendsTitle": "Ashab",
   "friendsComingSoon": "El-ashab jayin qrib — zid el-nas b el-handle mte3hom w abni el-grupe mte3ek.",
