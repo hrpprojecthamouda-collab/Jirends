@@ -102,7 +102,17 @@
 
   "detailTabOverview": "Overview",
   "detailTabMembers": "Members",
+  "detailTabItems": "Items",
   "detailTabComments": "Comments",
+
+  "itemsEmpty": "No items yet. Add things people can bring or do.",
+  "itemAddHint": "Add an item…",
+  "itemAdd": "Add",
+  "itemUnassigned": "Unassigned",
+  "itemClaim": "I'll do it",
+  "itemAssign": "Assign",
+  "itemUnassign": "Unassign",
+  "itemDelete": "Delete item",
 
   "detailNoDescription": "No description.",
   "detailStatus": "Status",
@@ -146,6 +156,11 @@
   "createSubmit": "Create event",
   "createNeedTitle": "Give it a title",
   "createEndBeforeStart": "End must be after start.",
+  "createSurpriseLabel": "Surprise for (optional)",
+  "createSurpriseHint": "Hidden from this friend — they can never see this event.",
+  "createSurpriseChoose": "Choose a friend",
+  "createSurpriseNone": "Not a surprise",
+  "createSurpriseClear": "Clear",
 
   "commonRetry": "Retry",
   "commonSomethingWrong": "Something went wrong."

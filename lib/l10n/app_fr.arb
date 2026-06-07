@@ -93,7 +93,17 @@
 
   "detailTabOverview": "Aperçu",
   "detailTabMembers": "Membres",
+  "detailTabItems": "Tâches",
   "detailTabComments": "Commentaires",
+
+  "itemsEmpty": "Aucune tâche. Ajoutez ce que chacun peut apporter ou faire.",
+  "itemAddHint": "Ajouter une tâche…",
+  "itemAdd": "Ajouter",
+  "itemUnassigned": "Non attribuée",
+  "itemClaim": "Je m’en charge",
+  "itemAssign": "Attribuer",
+  "itemUnassign": "Retirer l’attribution",
+  "itemDelete": "Supprimer la tâche",
 
   "detailNoDescription": "Aucune description.",
   "detailStatus": "Statut",
@@ -136,6 +146,11 @@
   "createSubmit": "Créer l’événement",
   "createNeedTitle": "Donnez-lui un titre",
   "createEndBeforeStart": "La fin doit être après le début.",
+  "createSurpriseLabel": "Surprise pour (facultatif)",
+  "createSurpriseHint": "Caché à cet ami — il ne pourra jamais voir cet événement.",
+  "createSurpriseChoose": "Choisir un ami",
+  "createSurpriseNone": "Pas une surprise",
+  "createSurpriseClear": "Effacer",
 
   "commonRetry": "Réessayer",
   "commonSomethingWrong": "Une erreur s’est produite."

@@ -94,7 +94,17 @@
 
   "detailTabOverview": "Aperçu",
   "detailTabMembers": "El-membres",
+  "detailTabItems": "El-mahem",
   "detailTabComments": "Commentaires",
+
+  "itemsEmpty": "Famma chay mahem. Zid 7ajat el-nas tnajem tjib wala ta3mel.",
+  "itemAddHint": "Zid mohem…",
+  "itemAdd": "Zid",
+  "itemUnassigned": "Mahouch maaroudh",
+  "itemClaim": "Ana na3mlou",
+  "itemAssign": "Aared",
+  "itemUnassign": "Na77i el-isnad",
+  "itemDelete": "Na77i el-mohem",
 
   "detailNoDescription": "Famma chay wasf.",
   "detailStatus": "El-7ala",
@@ -134,9 +144,14 @@
   "createFieldEnds": "Yekmel",
   "createFieldLocation": "Blasa (ikhtiyari)",
   "createPickDate": "Ekhtar date",
-  "createSubmit": "A3mel el-mناsba",
+  "createSubmit": "A3mel el-mnasba",
   "createNeedTitle": "Aatih 3onwan",
   "createEndBeforeStart": "El-nihaya lazem baad el-bidaya.",
+  "createSurpriseLabel": "Surprise l (ikhtiyari)",
+  "createSurpriseHint": "Mkhabbya 3al sahbek hetha — 3omrou ma ychouf el-mnasba.",
+  "createSurpriseChoose": "Ekhtar sahbek",
+  "createSurpriseNone": "Mech surprise",
+  "createSurpriseClear": "Na77i",
 
   "commonRetry": "3awed",
   "commonSomethingWrong": "Famma mochkla."

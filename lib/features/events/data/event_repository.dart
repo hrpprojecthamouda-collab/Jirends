@@ -77,6 +77,9 @@ class EventRepository {
     DateTime? startsAt,
     DateTime? endsAt,
     String? location,
+    /// The friend this event is hidden from (a surprise). The DB enforces the
+    /// guards: the target is never added as a member and can never read it.
+    String? surpriseTarget,
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw const AuthFailure('You are not signed in.');
@@ -91,6 +94,7 @@ class EventRepository {
             if (startsAt != null) 'starts_at': startsAt.toUtc().toIso8601String(),
             if (endsAt != null) 'ends_at': endsAt.toUtc().toIso8601String(),
             if (location != null && location.isNotEmpty) 'location': location,
+            'surprise_target': ?surpriseTarget,
           })
           .select()
           .single();
