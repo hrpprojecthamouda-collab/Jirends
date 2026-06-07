@@ -8,6 +8,42 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/profile.dart';
 
+/// A generic id→label picker (e.g. choose a group or crew). Returns the chosen
+/// id, or null if dismissed. Shows [emptyMessage] when there are none.
+Future<String?> showGenericPicker(
+  BuildContext context, {
+  required Map<String, String> labels,
+  required String emptyMessage,
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: AppColors.surface,
+    builder: (context) {
+      if (labels.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(emptyMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.inkMuted)),
+        );
+      }
+      final entries = labels.entries.toList();
+      return ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.only(bottom: 16),
+        children: [
+          for (final e in entries)
+            ListTile(
+              title: Text(e.value),
+              onTap: () => Navigator.of(context).pop(e.key),
+            ),
+        ],
+      );
+    },
+  );
+}
+
 Future<Profile?> showMemberPicker(
   BuildContext context, {
   required List<Profile> candidates,

@@ -43,6 +43,18 @@ class EventRepository {
     });
   }
 
+  /// Advance (or set) an event's status to a phase KEY. Organizer-only by RLS;
+  /// the composite FK (event_type, status) -> event_type_phases validates that
+  /// the phase belongs to the type, so an invalid key surfaces as a
+  /// PermissionFailure via mapToFailure.
+  Future<void> advanceStatus(String eventId, String phaseKey) async {
+    try {
+      await _table.update({'status': phaseKey}).eq('id', eventId);
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
+
   /// Fetch a single event by id. Returns null if it doesn't exist OR isn't
   /// visible to the user — by design we cannot (and must not) distinguish the
   /// two. `.maybeSingle()` gives null rather than throwing on zero rows.
