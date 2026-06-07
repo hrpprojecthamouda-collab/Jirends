@@ -99,6 +99,15 @@
   "detailTabMembers": "Membres",
   "detailTabItems": "Tâches",
   "detailTabComments": "Commentaires",
+  "detailTabFiles": "Fichiers",
+
+  "filesEmpty": "Aucun fichier. Joignez des itinéraires, billets ou photos.",
+  "filesAttach": "Joindre un fichier",
+  "filesUploading": "Envoi…",
+  "filesOpen": "Ouvrir",
+  "filesDelete": "Supprimer le fichier",
+  "filesDeleteConfirm": "Supprimer « {name} » ?",
+  "filesOpenFailed": "Impossible d’ouvrir le fichier.",
 
   "itemsEmpty": "Aucune tâche. Ajoutez ce que chacun peut apporter ou faire.",
   "itemAddHint": "Ajouter une tâche…",

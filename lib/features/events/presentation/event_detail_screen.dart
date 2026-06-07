@@ -15,6 +15,7 @@ import '../application/event_list_controller.dart';
 import '../data/event.dart';
 import '../data/event_member.dart';
 import 'tabs/comments_tab.dart';
+import 'tabs/files_tab.dart';
 import 'tabs/items_tab.dart';
 import 'tabs/members_tab.dart';
 import 'tabs/overview_tab.dart';
@@ -67,7 +68,7 @@ class _DetailScaffold extends ConsumerWidget {
     final typeColor = AppColors.forEventType(event.eventType);
 
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: Column(
@@ -99,6 +100,7 @@ class _DetailScaffold extends ConsumerWidget {
               Tab(text: t.detailTabMembers),
               Tab(text: t.detailTabItems),
               Tab(text: t.detailTabComments),
+              Tab(text: t.detailTabFiles),
             ],
           ),
         ),
@@ -108,6 +110,7 @@ class _DetailScaffold extends ConsumerWidget {
             MembersTab(event: event),
             ItemsTab(eventId: event.id),
             CommentsTab(eventId: event.id),
+            FilesTab(eventId: event.id),
           ],
         ),
       ),

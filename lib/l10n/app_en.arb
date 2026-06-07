@@ -110,6 +110,16 @@
   "detailTabMembers": "Members",
   "detailTabItems": "Items",
   "detailTabComments": "Comments",
+  "detailTabFiles": "Files",
+
+  "filesEmpty": "No files yet. Attach itineraries, tickets, or photos.",
+  "filesAttach": "Attach a file",
+  "filesUploading": "Uploading…",
+  "filesOpen": "Open",
+  "filesDelete": "Delete file",
+  "filesDeleteConfirm": "Delete “{name}”?",
+  "@filesDeleteConfirm": { "placeholders": { "name": { "type": "String" } } },
+  "filesOpenFailed": "Couldn't open the file.",
 
   "itemsEmpty": "No items yet. Add things people can bring or do.",
   "itemAddHint": "Add an item…",

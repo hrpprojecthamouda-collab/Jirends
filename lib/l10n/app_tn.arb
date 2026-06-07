@@ -100,6 +100,15 @@
   "detailTabMembers": "El-membres",
   "detailTabItems": "El-mahem",
   "detailTabComments": "Commentaires",
+  "detailTabFiles": "Fichiers",
+
+  "filesEmpty": "Famma chay fichier. Zid itinéraires, tickets wala tsawer.",
+  "filesAttach": "Zid fichier",
+  "filesUploading": "Bech yetzad…",
+  "filesOpen": "Hel",
+  "filesDelete": "Na77i el-fichier",
+  "filesDeleteConfirm": "Na77i « {name} »?",
+  "filesOpenFailed": "Manajamtech nhel el-fichier.",
 
   "itemsEmpty": "Famma chay mahem. Zid 7ajat el-nas tnajem tjib wala ta3mel.",
   "itemAddHint": "Zid mohem…",
