@@ -7,12 +7,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/event_detail_controller.dart';
 import '../application/event_list_controller.dart';
@@ -66,6 +64,43 @@ class _DetailScaffold extends ConsumerWidget {
         EventType.meetup => t.eventTypeMeetup,
       };
 
+  /// Inline title edit via a small dialog (the AppBar is too cramped for an
+  /// in-place editor). Organizer-only; RLS enforces regardless.
+  Future<void> _editTitle(BuildContext context, WidgetRef ref) async {
+    final t = AppLocalizations.of(context);
+    final controller = TextEditingController(text: event.title);
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.createFieldTitle),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 140,
+          decoration: const InputDecoration(counterText: ''),
+          onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+        ),
+        actions: [
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
+            icon: const Icon(Icons.close, color: AppColors.coral),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).okButtonLabel,
+            icon: const Icon(Icons.check, color: AppColors.teal),
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newTitle == null || newTitle.isEmpty || newTitle == event.title) return;
+    await ref
+        .read(editEventControllerProvider.notifier)
+        .save(event.id, title: newTitle);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
@@ -78,36 +113,42 @@ class _DetailScaffold extends ConsumerWidget {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
-          actions: [
-            if (canEdit)
-              IconButton(
-                tooltip: t.editTitle,
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () =>
-                    context.push(AppRoutes.eventEdit(event.id), extra: event),
-              ),
-          ],
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(event.title,
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-              Row(
-                children: [
-                  Text(_typeLabel(t),
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(color: typeColor)),
-                  if (event.isSurprise) ...[
-                    const SizedBox(width: 8),
-                    const Icon(Icons.visibility_off_outlined,
-                        size: 14, color: AppColors.yellow),
-                  ],
+          title: InkWell(
+            onTap: canEdit ? () => _editTitle(context, ref) : null,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(event.title,
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Row(
+                        children: [
+                          Text(_typeLabel(t),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(color: typeColor)),
+                          if (event.isSurprise) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.visibility_off_outlined,
+                                size: 14, color: AppColors.yellow),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (canEdit) ...[
+                  const SizedBox(width: 8),
+                  const Icon(Icons.edit_outlined,
+                      size: 16, color: AppColors.inkMuted),
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
           bottom: TabBar(
             isScrollable: true,
