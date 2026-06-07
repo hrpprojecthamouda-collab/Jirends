@@ -7,10 +7,14 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
+import '../application/event_detail_controller.dart';
 import '../application/event_list_controller.dart';
 import '../data/event.dart';
 import '../data/event_member.dart';
@@ -66,11 +70,23 @@ class _DetailScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final typeColor = AppColors.forEventType(event.eventType);
+    final myId = ref.watch(currentUserIdProvider);
+    final members = ref.watch(eventMembersProvider(event.id)).value ?? const [];
+    final canEdit = isCurrentUserOrganizer(members, myId);
 
     return DefaultTabController(
       length: 5,
       child: Scaffold(
         appBar: AppBar(
+          actions: [
+            if (canEdit)
+              IconButton(
+                tooltip: t.editTitle,
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () =>
+                    context.push(AppRoutes.eventEdit(event.id), extra: event),
+              ),
+          ],
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,

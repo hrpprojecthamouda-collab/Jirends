@@ -68,3 +68,43 @@ class CreateEventController extends AsyncNotifier<void> {
 
 final createEventControllerProvider =
     AsyncNotifierProvider<CreateEventController, void>(CreateEventController.new);
+
+/// Action controller for editing an existing event's core fields (organizer
+/// only — RLS enforces). Invalidates the single-event view on success so the
+/// detail header refreshes; the list updates live via realtime.
+class EditEventController extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<bool> save(
+    String eventId, {
+    String? title,
+    String? description,
+    bool clearDescription = false,
+    DateTime? startsAt,
+    bool clearStartsAt = false,
+    DateTime? endsAt,
+    bool clearEndsAt = false,
+    String? location,
+    bool clearLocation = false,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => ref.read(eventRepositoryProvider).updateEvent(
+          eventId,
+          title: title,
+          description: description,
+          clearDescription: clearDescription,
+          startsAt: startsAt,
+          clearStartsAt: clearStartsAt,
+          endsAt: endsAt,
+          clearEndsAt: clearEndsAt,
+          location: location,
+          clearLocation: clearLocation,
+        ));
+    if (!state.hasError) ref.invalidate(eventByIdProvider(eventId));
+    return !state.hasError;
+  }
+}
+
+final editEventControllerProvider =
+    AsyncNotifierProvider<EditEventController, void>(EditEventController.new);

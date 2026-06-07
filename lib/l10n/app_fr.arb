@@ -164,6 +164,8 @@
   "createSurpriseChoose": "Choisir un ami",
   "createSurpriseNone": "Pas une surprise",
   "createSurpriseClear": "Effacer",
+  "editTitle": "Modifier l’événement",
+  "editSave": "Enregistrer",
 
   "commonRetry": "Réessayer",
   "commonSomethingWrong": "Une erreur s’est produite."

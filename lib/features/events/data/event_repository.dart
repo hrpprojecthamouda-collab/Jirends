@@ -43,6 +43,55 @@ class EventRepository {
     });
   }
 
+  /// Update an event's editable core fields. Organizer-only by RLS
+  /// (events_update_organizer). Passing a field updates it; description /
+  /// location / dates can be cleared by passing an explicit null via the
+  /// [clear*] flags (since a null value alone is "leave unchanged" here).
+  Future<Event> updateEvent(
+    String eventId, {
+    String? title,
+    String? description,
+    bool clearDescription = false,
+    DateTime? startsAt,
+    bool clearStartsAt = false,
+    DateTime? endsAt,
+    bool clearEndsAt = false,
+    String? location,
+    bool clearLocation = false,
+  }) async {
+    try {
+      final patch = <String, dynamic>{};
+      if (title != null) patch['title'] = title;
+      // For nullable fields: a clear flag sets null; otherwise a non-null value
+      // updates; otherwise the field is left untouched (absent from the patch).
+      if (clearDescription) {
+        patch['description'] = null;
+      } else if (description != null) {
+        patch['description'] = description;
+      }
+      if (clearStartsAt) {
+        patch['starts_at'] = null;
+      } else if (startsAt != null) {
+        patch['starts_at'] = startsAt.toUtc().toIso8601String();
+      }
+      if (clearEndsAt) {
+        patch['ends_at'] = null;
+      } else if (endsAt != null) {
+        patch['ends_at'] = endsAt.toUtc().toIso8601String();
+      }
+      if (clearLocation) {
+        patch['location'] = null;
+      } else if (location != null) {
+        patch['location'] = location;
+      }
+      final row =
+          await _table.update(patch).eq('id', eventId).select().single();
+      return Event.fromJson(row);
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
+
   /// Advance (or set) an event's status to a phase KEY. Organizer-only by RLS;
   /// the composite FK (event_type, status) -> event_type_phases validates that
   /// the phase belongs to the type, so an invalid key surfaces as a

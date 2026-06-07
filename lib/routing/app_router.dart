@@ -25,6 +25,8 @@ import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/events/presentation/events_list_screen.dart';
 import '../features/events/presentation/create_event_screen.dart';
 import '../features/events/presentation/event_detail_screen.dart';
+import '../features/events/presentation/edit_event_screen.dart';
+import '../features/events/data/event.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/groups/presentation/groups_screen.dart';
 import '../features/groups/presentation/group_detail_screen.dart';
@@ -53,6 +55,9 @@ class AppRoutes {
 
   /// Detail route for one event. Path: /events/:id
   static String eventDetail(String id) => '/events/$id';
+
+  /// Edit route for one event. Path: /events/:id/edit (pass the Event as extra)
+  static String eventEdit(String id) => '/events/$id/edit';
 
   /// Detail routes within the Groups branch.
   static String groupDetail(String id) => '/groups/group/$id';
@@ -136,6 +141,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: ':id',
                   builder: (context, state) =>
                       EventDetailScreen(eventId: state.pathParameters['id']!),
+                  routes: [
+                    GoRoute(
+                      path: 'edit',
+                      builder: (context, state) =>
+                          EditEventScreen(event: state.extra! as Event),
+                    ),
+                  ],
                 ),
               ],
             ),
