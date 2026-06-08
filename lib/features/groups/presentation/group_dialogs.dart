@@ -8,23 +8,53 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// Prompt for a name and run [onSubmit] with the trimmed value (if non-empty).
+/// The text controller is owned by [_NameDialog] (a StatefulWidget) so it is
+/// disposed only after the route is fully removed — disposing it right after the
+/// await would fire the framework's `_dependents.isEmpty` assertion while the
+/// dismissing TextField still depends on it.
 Future<void> showCreateNameDialog(
   BuildContext context, {
   required String title,
   required String label,
   required Future<void> Function(String name) onSubmit,
 }) async {
-  final t = AppLocalizations.of(context);
-  final controller = TextEditingController();
   final name = await showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
+    builder: (_) => _NameDialog(title: title, label: label),
+  );
+  if (name != null && name.trim().isNotEmpty) {
+    await onSubmit(name.trim());
+  }
+}
+
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.title, required this.label});
+  final String title;
+  final String label;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(widget.title),
       content: TextField(
-        controller: controller,
+        controller: _controller,
         autofocus: true,
         maxLength: 60,
-        decoration: InputDecoration(labelText: label),
+        decoration: InputDecoration(labelText: widget.label),
         onSubmitted: (v) => Navigator.of(context).pop(v),
       ),
       actions: [
@@ -33,15 +63,11 @@ Future<void> showCreateNameDialog(
           child: Text(t.commonCancel),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(controller.text),
+          onPressed: () => Navigator.of(context).pop(_controller.text),
           child: Text(t.commonAdd),
         ),
       ],
-    ),
-  );
-  controller.dispose();
-  if (name != null && name.trim().isNotEmpty) {
-    await onSubmit(name.trim());
+    );
   }
 }
 

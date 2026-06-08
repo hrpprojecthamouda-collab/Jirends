@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/profile.dart';
+import '../../groups/presentation/group_dialogs.dart';
 import '../../shell/presentation/placeholder_body.dart';
 import '../application/friend_list_controller.dart';
 
@@ -55,43 +56,23 @@ class FriendsScreen extends ConsumerWidget {
 
   Future<void> _showAddDialog(BuildContext context, WidgetRef ref) async {
     final t = AppLocalizations.of(context);
-    final controller = TextEditingController();
-    final handle = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.friendsAddByHandle),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: t.friendsHandleLabel,
-            hintText: t.friendsHandleHint,
-          ),
-          onSubmitted: (v) => Navigator.of(context).pop(v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(t.commonAdd),
-          ),
-        ],
-      ),
+    final messenger = ScaffoldMessenger.of(context);
+    // Reuses the shared name-prompt dialog (which owns its controller correctly).
+    await showCreateNameDialog(
+      context,
+      title: t.friendsAddByHandle,
+      label: t.friendsHandleLabel,
+      onSubmit: (handle) async {
+        final ok = await ref
+            .read(friendActionsControllerProvider.notifier)
+            .addByHandle(handle);
+        if (ok) {
+          messenger
+            ..clearSnackBars()
+            ..showSnackBar(SnackBar(content: Text(t.friendsAdded(handle))));
+        }
+      },
     );
-    controller.dispose();
-    if (handle == null || handle.trim().isEmpty) return;
-
-    final ok =
-        await ref.read(friendActionsControllerProvider.notifier).addByHandle(handle);
-    if (ok && context.mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-            SnackBar(content: Text(t.friendsAdded(handle.trim()))));
-    }
   }
 }
 

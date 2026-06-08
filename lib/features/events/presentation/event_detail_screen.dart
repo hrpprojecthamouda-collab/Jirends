@@ -83,40 +83,19 @@ class _DetailScaffold extends ConsumerWidget {
   /// Inline title edit via a small dialog (the AppBar is too cramped for an
   /// in-place editor). Organizer-only; RLS enforces regardless. We capture the
   /// notifier BEFORE the await so we never touch this widget's `ref`/`context`
-  /// after the dialog closes and the detail screen rebuilds.
+  /// after the dialog closes and the detail screen rebuilds. The dialog's text
+  /// controller is owned by [_TitleEditDialog] (a StatefulWidget) so it is
+  /// disposed only after the route is fully gone — disposing it here, right
+  /// after the await, fires the framework's `_dependents.isEmpty` assertion
+  /// because the dismissing TextField still depends on it.
   Future<void> _editTitle(BuildContext context, WidgetRef ref) async {
-    final t = AppLocalizations.of(context);
     final notifier = ref.read(editEventControllerProvider.notifier);
     final eventId = event.id;
     final currentTitle = event.title;
-    final controller = TextEditingController(text: currentTitle);
     final newTitle = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(t.createFieldTitle),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 140,
-          decoration: const InputDecoration(counterText: ''),
-          onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
-        ),
-        actions: [
-          IconButton(
-            tooltip: t.commonCancel,
-            icon: const Icon(Icons.close, color: AppColors.coral),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-          IconButton(
-            tooltip: t.commonAdd,
-            icon: const Icon(Icons.check, color: AppColors.teal),
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
-          ),
-        ],
-      ),
+      builder: (_) => _TitleEditDialog(initial: currentTitle),
     );
-    controller.dispose();
     if (newTitle == null || newTitle.isEmpty || newTitle == currentTitle) return;
     await notifier.save(eventId, title: newTitle);
   }
@@ -201,4 +180,53 @@ class _DetailScaffold extends ConsumerWidget {
 bool isCurrentUserOrganizer(
     List<EventMember> members, String? myUserId) {
   return members.any((m) => m.userId == myUserId && m.isOrganizer);
+}
+
+/// A tiny title-edit dialog that OWNS its TextEditingController and disposes it
+/// in its own dispose() — i.e. only after the route is fully removed. Pops with
+/// the trimmed title (or null on cancel).
+class _TitleEditDialog extends StatefulWidget {
+  const _TitleEditDialog({required this.initial});
+  final String initial;
+
+  @override
+  State<_TitleEditDialog> createState() => _TitleEditDialogState();
+}
+
+class _TitleEditDialogState extends State<_TitleEditDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(t.createFieldTitle),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 140,
+        decoration: const InputDecoration(counterText: ''),
+        onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+      ),
+      actions: [
+        IconButton(
+          tooltip: t.commonCancel,
+          icon: const Icon(Icons.close, color: AppColors.coral),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        IconButton(
+          tooltip: t.commonAdd,
+          icon: const Icon(Icons.check, color: AppColors.teal),
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+        ),
+      ],
+    );
+  }
 }
