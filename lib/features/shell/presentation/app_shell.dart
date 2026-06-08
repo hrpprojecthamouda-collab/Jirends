@@ -1,19 +1,17 @@
-/// AppShell — the persistent navigation frame for signed-in users. A narrow,
-/// icon-only left rail (Home / Events / Friends / Groups) with a Settings gear
-/// pinned at the bottom. Each rail destination is a branch of a
-/// StatefulShellRoute, so switching tabs preserves each branch's own nav stack.
+/// AppShell — the persistent navigation frame for signed-in users: a bottom
+/// NavigationBar (Home / Events / Friends / Groups). Each destination is a
+/// branch of a StatefulShellRoute, so switching tabs preserves each branch's
+/// own nav stack.
 ///
-/// This is pure chrome: it holds no business or visibility logic. The gear is a
-/// top-level route (an overlay), not a branch, so opening Settings doesn't
-/// disturb the four branches' state.
+/// This is pure chrome: it holds no business or visibility logic. Settings now
+/// lives under Profile (reached via the avatar in each screen's app bar), so it
+/// is no longer a nav destination here.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../routing/app_router.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -25,54 +23,32 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    final destinations = <_Dest>[
-      _Dest(Icons.home_outlined, Icons.home_rounded, t.navHome),
-      _Dest(Icons.event_outlined, Icons.event_rounded, t.navEvents),
-      _Dest(Icons.people_outline, Icons.people_rounded, t.navFriends),
-      _Dest(Icons.workspaces_outline, Icons.workspaces_rounded, t.navGroups),
-    ];
-
     return Scaffold(
-      body: Row(
-        children: [
-          NavigationRail(
-            minWidth: 72,
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: _onTap,
-            // Brand mark up top, settings gear pinned at the bottom.
-            leading: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Icon(Icons.celebration_rounded,
-                  color: AppColors.violet, size: 28),
-            ),
-            trailing: Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Tooltip(
-                    message: t.navSettings,
-                    child: IconButton(
-                      icon: const Icon(Icons.settings_outlined),
-                      color: AppColors.inkMuted,
-                      onPressed: () => context.go(AppRoutes.settings),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            destinations: [
-              for (final d in destinations)
-                NavigationRailDestination(
-                  icon: Tooltip(message: d.label, child: Icon(d.icon)),
-                  selectedIcon:
-                      Tooltip(message: d.label, child: Icon(d.selectedIcon)),
-                  label: Text(d.label),
-                ),
-            ],
+      body: navigationShell,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: _onTap,
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home_rounded),
+            label: t.navHome,
           ),
-          const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: navigationShell),
+          NavigationDestination(
+            icon: const Icon(Icons.event_outlined),
+            selectedIcon: const Icon(Icons.event_rounded),
+            label: t.navEvents,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.people_outline),
+            selectedIcon: const Icon(Icons.people_rounded),
+            label: t.navFriends,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.workspaces_outline),
+            selectedIcon: const Icon(Icons.workspaces_rounded),
+            label: t.navGroups,
+          ),
         ],
       ),
     );
@@ -86,11 +62,4 @@ class AppShell extends StatelessWidget {
       initialLocation: index == navigationShell.currentIndex,
     );
   }
-}
-
-class _Dest {
-  const _Dest(this.icon, this.selectedIcon, this.label);
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
 }

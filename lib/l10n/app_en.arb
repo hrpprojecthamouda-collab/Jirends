@@ -16,6 +16,9 @@
   "settingsLanguage": "Language",
   "settingsSignOut": "Sign out",
 
+  "profileTitle": "Profile",
+  "profileNoHandle": "No handle yet",
+
   "homeTitle": "Home",
   "homeActivityEmpty": "No recent activity yet. When friends comment or add items on your events, you'll see it here.",
   "activityComment": "{who} commented on {event}",

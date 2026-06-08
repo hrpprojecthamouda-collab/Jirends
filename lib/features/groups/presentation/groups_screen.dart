@@ -16,6 +16,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../profile/presentation/profile_avatar_button.dart';
 import '../application/crew_list_controller.dart';
 import '../application/group_list_controller.dart';
 import 'group_dialogs.dart';
@@ -34,7 +35,10 @@ class GroupsScreen extends ConsumerWidget {
     ref.listen(crewActionsControllerProvider, (_, n) => _maybeError(context, n));
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.groupsTitle)),
+      appBar: AppBar(
+        leading: const ProfileAvatarButton(),
+        title: Text(t.groupsTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
         children: [

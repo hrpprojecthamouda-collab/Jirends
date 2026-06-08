@@ -16,6 +16,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../profile/presentation/profile_avatar_button.dart';
 import '../application/event_list_controller.dart';
 import 'widgets/agenda_view.dart';
 import 'widgets/event_card.dart';
@@ -39,6 +40,7 @@ class _EventsListScreenState extends ConsumerState<EventsListScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const ProfileAvatarButton(),
         title: Text(t.eventsTitle),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),

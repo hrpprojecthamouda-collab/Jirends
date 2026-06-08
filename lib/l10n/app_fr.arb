@@ -14,6 +14,9 @@
   "settingsLanguage": "Langue",
   "settingsSignOut": "Se déconnecter",
 
+  "profileTitle": "Profil",
+  "profileNoHandle": "Pas encore d’identifiant",
+
   "homeTitle": "Accueil",
   "homeActivityEmpty": "Aucune activité récente. Quand vos amis commentent ou ajoutent des tâches à vos événements, vous le verrez ici.",
   "activityComment": "{who} a commenté {event}",

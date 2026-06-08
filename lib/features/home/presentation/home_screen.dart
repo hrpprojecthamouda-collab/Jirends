@@ -12,7 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
-import '../../auth/data/profile_repository.dart';
+import '../../profile/presentation/profile_avatar_button.dart';
 import '../../shell/presentation/placeholder_body.dart';
 import '../application/activity_controller.dart';
 import '../data/activity_item.dart';
@@ -23,12 +23,12 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
-    final handle = ref.watch(myProfileProvider).value?.handle;
     final feed = ref.watch(activityFeedProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(handle == null ? t.homeTitle : '${t.homeTitle} · $handle'),
+        leading: const ProfileAvatarButton(),
+        title: Text(t.homeTitle),
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(activityFeedProvider),

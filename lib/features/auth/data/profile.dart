@@ -26,4 +26,17 @@ abstract class Profile with _$Profile {
 
   /// The display handle, e.g. `Sparrow#TheCrew`, or null if not set.
   String? get handle => hasHandle ? '$nickname#$tagline' : null;
+
+  /// Up to two initials for an avatar: first letters of nickname + tagline, or
+  /// the first two of the nickname, falling back to '?'.
+  String get initials {
+    final n = nickname?.trim() ?? '';
+    final tag = tagline?.trim() ?? '';
+    if (n.isNotEmpty && tag.isNotEmpty) {
+      return (n[0] + tag[0]).toUpperCase();
+    }
+    if (n.length >= 2) return n.substring(0, 2).toUpperCase();
+    if (n.isNotEmpty) return n[0].toUpperCase();
+    return '?';
+  }
 }

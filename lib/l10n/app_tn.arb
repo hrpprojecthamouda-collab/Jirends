@@ -15,6 +15,9 @@
   "settingsLanguage": "Lougha",
   "settingsSignOut": "Khrouj",
 
+  "profileTitle": "Profil",
+  "profileNoHandle": "Mazel famma handle",
+
   "homeTitle": "Dar",
   "homeActivityEmpty": "Mazel famma chay jdid. Ki ashabek ykommntiw wala yzidou mahem fi mnasbatek, bech tlqahom houni.",
   "activityComment": "{who} kommnta 3la {event}",

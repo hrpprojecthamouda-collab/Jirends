@@ -31,6 +31,7 @@ import '../features/groups/presentation/group_detail_screen.dart';
 import '../features/groups/presentation/crew_detail_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/home/presentation/splash_screen.dart';
+import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/app_shell.dart';
 
@@ -46,7 +47,8 @@ class AppRoutes {
   static const friends = '/friends';
   static const groups = '/groups';
 
-  // Overlay (top-level, not a branch).
+  // Overlays (top-level, not branches).
+  static const profile = '/profile';
   static const settings = '/settings';
 
   static const createEvent = '/events/new';
@@ -110,11 +112,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: AppRoutes.onboarding,
           builder: (_, _) => const OnboardingScreen()),
 
-      // ── Settings: top-level overlay, not a branch ──────────────────────
+      // ── Profile + Settings: top-level overlays, not branches ───────────
+      GoRoute(
+          path: AppRoutes.profile, builder: (_, _) => const ProfileScreen()),
       GoRoute(
           path: AppRoutes.settings, builder: (_, _) => const SettingsScreen()),
 
-      // ── The signed-in app shell: nav rail + four branches ──────────────
+      // ── The signed-in app shell: bottom nav + four branches ────────────
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
