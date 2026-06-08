@@ -14,8 +14,10 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/event_detail_controller.dart';
 import '../application/event_list_controller.dart';
+import '../application/event_status_controller.dart';
 import '../data/event.dart';
 import '../data/event_member.dart';
+import '../data/event_phase.dart';
 import 'tabs/comments_tab.dart';
 import 'tabs/files_tab.dart';
 import 'tabs/items_tab.dart';
@@ -31,17 +33,20 @@ class EventDetailScreen extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final eventAsync = ref.watch(eventByIdProvider(eventId));
 
-    // Surface edit errors here (top level) so they show regardless of which tab
-    // is active, and so the edit controller is always observed (never disposed
-    // mid-save). The previous event value is kept during a refresh so the
-    // screen doesn't collapse to a spinner after a save invalidates it.
-    ref.listen(editEventControllerProvider, (_, next) {
+    // Surface edit + status errors here (top level) so they show regardless of
+    // which tab is active, and so those controllers are always observed (never
+    // disposed mid-action). The previous event value is kept during a refresh so
+    // the screen doesn't collapse to a spinner after an action invalidates it.
+    void onActionError(_, AsyncValue next) {
       if (next.hasError && !next.isLoading) {
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(SnackBar(content: Text(messageForError(next.error!))));
       }
-    });
+    }
+
+    ref.listen(editEventControllerProvider, onActionError);
+    ref.listen(eventStatusControllerProvider, onActionError);
 
     // Keep showing the last known event while a refresh is in flight; only show
     // the spinner on the very first load (no value yet).
@@ -149,6 +154,10 @@ class _DetailScaffold extends ConsumerWidget {
               ],
             ),
           ),
+          actions: [
+            _StatusChip(event: event, canEdit: canEdit),
+            const SizedBox(width: 8),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabs: [
@@ -180,6 +189,99 @@ class _DetailScaffold extends ConsumerWidget {
 bool isCurrentUserOrganizer(
     List<EventMember> members, String? myUserId) {
   return members.any((m) => m.userId == myUserId && m.isOrganizer);
+}
+
+/// The current-status chip shown top-right in the app bar. Tinted by the phase;
+/// organizers tap it to advance the event to another phase (a bottom sheet of
+/// the type's phases). Read-only for non-organizers. The phase LABEL comes from
+/// event_type_phases (config), falling back to the raw key while loading.
+class _StatusChip extends ConsumerWidget {
+  const _StatusChip({required this.event, required this.canEdit});
+  final Event event;
+  final bool canEdit;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final phasesAsync = ref.watch(eventPhasesProvider(event.eventType));
+    final phases = phasesAsync.value ?? const <EventPhase>[];
+    final color = AppColors.forPhaseKey(event.status);
+    final label = _labelFor(event.status, phases);
+
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        // ignore: deprecated_member_use
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: color, fontWeight: FontWeight.w700)),
+          if (canEdit) ...[
+            const SizedBox(width: 2),
+            Icon(Icons.arrow_drop_down, size: 18, color: color),
+          ],
+        ],
+      ),
+    );
+
+    return Center(
+      child: canEdit
+          ? InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _advance(context, ref, phases),
+              child: chip,
+            )
+          : chip,
+    );
+  }
+
+  String _labelFor(String? key, List<EventPhase> phases) {
+    if (key == null) return '…';
+    for (final p in phases) {
+      if (p.key == key) return p.label;
+    }
+    // Fallback: title-case the raw key.
+    return key.isEmpty
+        ? key
+        : key[0].toUpperCase() + key.substring(1).replaceAll('_', ' ');
+  }
+
+  Future<void> _advance(
+      BuildContext context, WidgetRef ref, List<EventPhase> phases) async {
+    final notifier = ref.read(eventStatusControllerProvider.notifier);
+    final eventId = event.id;
+    final key = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final p in phases)
+              ListTile(
+                leading: Icon(Icons.circle,
+                    size: 12, color: AppColors.forPhaseKey(p.key)),
+                title: Text(p.label),
+                trailing: event.status == p.key
+                    ? const Icon(Icons.check, color: AppColors.violet)
+                    : null,
+                onTap: () => Navigator.of(sheetContext).pop(p.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (key == null || key == event.status) return;
+    await notifier.advance(eventId, key);
+  }
 }
 
 /// A tiny title-edit dialog that OWNS its TextEditingController and disposes it
