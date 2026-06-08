@@ -144,6 +144,7 @@
   "itemDelete": "Delete item",
 
   "detailNoDescription": "No description.",
+  "detailDescription": "Description",
   "detailStatus": "Status",
   "detailWhen": "When",
   "detailWhere": "Where",

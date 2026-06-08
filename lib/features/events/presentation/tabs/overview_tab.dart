@@ -29,37 +29,88 @@ class OverviewTab extends ConsumerWidget {
     final edit = ref.read(editEventControllerProvider.notifier);
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
-        // Description — tap to edit (organizers).
-        InlineEditableText(
-          value: event.description ?? '',
-          placeholder: t.detailNoDescription,
-          canEdit: isOrganizer,
-          multiline: true,
-          maxLength: 2000,
-          onSubmit: (v) => edit.save(
-            event.id,
-            description: v.isEmpty ? null : v,
-            clearDescription: v.isEmpty,
+        // Description block — bigger. Soft separation only (label + hairline).
+        _Block(
+          label: t.detailDescription,
+          minHeight: 140,
+          child: InlineEditableText(
+            value: event.description ?? '',
+            placeholder: t.detailNoDescription,
+            canEdit: isOrganizer,
+            multiline: true,
+            maxLength: 2000,
+            onSubmit: (v) => edit.save(
+              event.id,
+              description: v.isEmpty ? null : v,
+              clearDescription: v.isEmpty,
+            ),
           ),
         ),
-        const SizedBox(height: 20),
+        // Date block.
+        _Block(
+          label: t.detailWhen,
+          child: _DatesRow(event: event, canEdit: isOrganizer),
+        ),
+        // Place block (last one: no trailing divider).
+        _Block(
+          label: t.detailWhere,
+          divider: false,
+          child: InlineEditableText(
+            value: event.location ?? '',
+            placeholder: t.detailWhere,
+            canEdit: isOrganizer,
+            leading: Icons.place_outlined,
+            onSubmit: (v) => edit.save(
+              event.id,
+              location: v.isEmpty ? null : v,
+              clearLocation: v.isEmpty,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-        // When (tap to edit dates) / Where (tap to edit location).
-        _DatesRow(event: event, canEdit: isOrganizer),
-        const SizedBox(height: 4),
-        InlineEditableText(
-          value: event.location ?? '',
-          placeholder: t.detailWhere,
-          canEdit: isOrganizer,
-          leading: Icons.place_outlined,
-          onSubmit: (v) => edit.save(
-            event.id,
-            location: v.isEmpty ? null : v,
-            clearLocation: v.isEmpty,
-          ),
+/// A soft "block" of overview data: a small muted label above the content, with
+/// generous spacing and a hairline divider below (unless [divider] is false).
+/// Not a card — just a visual grouping/separation. [minHeight] lets the
+/// description block be visibly taller.
+class _Block extends StatelessWidget {
+  const _Block({
+    required this.label,
+    required this.child,
+    this.minHeight = 0,
+    this.divider = true,
+  });
+  final String label;
+  final Widget child;
+  final double minHeight;
+  final bool divider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        Text(
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.inkMuted,
+                letterSpacing: 1.1,
+                fontWeight: FontWeight.w700,
+              ),
         ),
+        const SizedBox(height: 8),
+        ConstrainedBox(
+          constraints: BoxConstraints(minHeight: minHeight),
+          child: Align(alignment: Alignment.topLeft, child: child),
+        ),
+        const SizedBox(height: 18),
+        if (divider) const Divider(height: 1, color: AppColors.outline),
       ],
     );
   }

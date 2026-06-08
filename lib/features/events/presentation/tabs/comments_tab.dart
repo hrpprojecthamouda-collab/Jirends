@@ -90,11 +90,17 @@ class _CommentsTabState extends ConsumerState<CommentsTab> {
           ),
         ),
         const Divider(height: 1),
-        // Compose box
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        // Compose box — pinned to the bottom and lifted above the keyboard when
+        // it opens (the tall ticket app bar otherwise pushes it off-screen).
+        Padding(
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 8,
+            top: 8,
+            bottom: 8 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SafeArea(
+            top: false,
             child: Row(
               children: [
                 Expanded(

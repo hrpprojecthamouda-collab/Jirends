@@ -131,6 +131,7 @@
   "itemDelete": "Supprimer la tâche",
 
   "detailNoDescription": "Aucune description.",
+  "detailDescription": "Description",
   "detailStatus": "Statut",
   "detailWhen": "Quand",
   "detailWhere": "Où",
