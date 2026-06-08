@@ -34,16 +34,15 @@ class OverviewTab extends ConsumerWidget {
     final phases = ref.watch(eventPhasesProvider(event.eventType));
     final reactions = ref.watch(eventReactionsProvider(event.id)).value ?? const [];
 
-    void onActionError(_, AsyncValue n) {
+    // Status errors surface here; edit-controller errors are surfaced once at
+    // the EventDetailScreen level (so they show from any tab without doubling).
+    ref.listen(eventStatusControllerProvider, (_, n) {
       if (n.hasError && !n.isLoading) {
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(SnackBar(content: Text(messageForError(n.error!))));
       }
-    }
-
-    ref.listen(eventStatusControllerProvider, onActionError);
-    ref.listen(editEventControllerProvider, onActionError);
+    });
 
     final edit = ref.read(editEventControllerProvider.notifier);
 

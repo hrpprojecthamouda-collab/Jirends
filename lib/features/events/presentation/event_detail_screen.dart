@@ -31,24 +31,40 @@ class EventDetailScreen extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final eventAsync = ref.watch(eventByIdProvider(eventId));
 
-    return eventAsync.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, _) =>
-          Scaffold(appBar: AppBar(), body: Center(child: Text(messageForError(err)))),
-      data: (event) {
-        if (event == null) {
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(t.eventsUnavailable, textAlign: TextAlign.center),
-              ),
-            ),
-          );
-        }
-        return _DetailScaffold(event: event);
-      },
+    // Surface edit errors here (top level) so they show regardless of which tab
+    // is active, and so the edit controller is always observed (never disposed
+    // mid-save). The previous event value is kept during a refresh so the
+    // screen doesn't collapse to a spinner after a save invalidates it.
+    ref.listen(editEventControllerProvider, (_, next) {
+      if (next.hasError && !next.isLoading) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(messageForError(next.error!))));
+      }
+    });
+
+    // Keep showing the last known event while a refresh is in flight; only show
+    // the spinner on the very first load (no value yet).
+    final event = eventAsync.value;
+    if (event != null) return _DetailScaffold(event: event);
+
+    if (eventAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (eventAsync.hasError) {
+      return Scaffold(
+          appBar: AppBar(),
+          body: Center(child: Text(messageForError(eventAsync.error!))));
+    }
+    // Loaded but null => not visible / doesn't exist.
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(t.eventsUnavailable, textAlign: TextAlign.center),
+        ),
+      ),
     );
   }
 }
@@ -65,40 +81,44 @@ class _DetailScaffold extends ConsumerWidget {
       };
 
   /// Inline title edit via a small dialog (the AppBar is too cramped for an
-  /// in-place editor). Organizer-only; RLS enforces regardless.
+  /// in-place editor). Organizer-only; RLS enforces regardless. We capture the
+  /// notifier BEFORE the await so we never touch this widget's `ref`/`context`
+  /// after the dialog closes and the detail screen rebuilds.
   Future<void> _editTitle(BuildContext context, WidgetRef ref) async {
     final t = AppLocalizations.of(context);
-    final controller = TextEditingController(text: event.title);
+    final notifier = ref.read(editEventControllerProvider.notifier);
+    final eventId = event.id;
+    final currentTitle = event.title;
+    final controller = TextEditingController(text: currentTitle);
     final newTitle = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(t.createFieldTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 140,
           decoration: const InputDecoration(counterText: ''),
-          onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+          onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
         ),
         actions: [
           IconButton(
-            tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
+            tooltip: t.commonCancel,
             icon: const Icon(Icons.close, color: AppColors.coral),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
           ),
           IconButton(
-            tooltip: MaterialLocalizations.of(context).okButtonLabel,
+            tooltip: t.commonAdd,
             icon: const Icon(Icons.check, color: AppColors.teal),
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
           ),
         ],
       ),
     );
     controller.dispose();
-    if (newTitle == null || newTitle.isEmpty || newTitle == event.title) return;
-    await ref
-        .read(editEventControllerProvider.notifier)
-        .save(event.id, title: newTitle);
+    if (newTitle == null || newTitle.isEmpty || newTitle == currentTitle) return;
+    await notifier.save(eventId, title: newTitle);
   }
 
   @override
