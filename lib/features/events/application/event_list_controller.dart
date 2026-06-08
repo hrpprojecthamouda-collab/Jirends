@@ -104,6 +104,15 @@ class EditEventController extends AsyncNotifier<void> {
     if (!state.hasError) ref.invalidate(eventByIdProvider(eventId));
     return !state.hasError;
   }
+
+  /// Delete the event (organizer only — RLS enforces). Returns true on success;
+  /// the caller pops back to the list, which updates live via realtime.
+  Future<bool> delete(String eventId) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+        () => ref.read(eventRepositoryProvider).deleteEvent(eventId));
+    return !state.hasError;
+  }
 }
 
 final editEventControllerProvider =

@@ -43,6 +43,17 @@ class EventRepository {
     });
   }
 
+  /// Delete an event. Organizer-only by RLS (events_delete_organizer); a
+  /// non-organizer's delete simply affects no rows. Cascades remove the event's
+  /// members/items/comments/reactions/attachments rows.
+  Future<void> deleteEvent(String eventId) async {
+    try {
+      await _table.delete().eq('id', eventId);
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
+
   /// Update an event's editable core fields. Organizer-only by RLS
   /// (events_update_organizer). Passing a field updates it; description /
   /// location / dates can be cleared by passing an explicit null via the
