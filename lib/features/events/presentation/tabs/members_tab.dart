@@ -42,6 +42,7 @@ class MembersTab extends ConsumerWidget {
       error: (e, _) => Center(child: Text(messageForError(e))),
       data: (members) {
         final isOrganizer = isCurrentUserOrganizer(members, myId);
+        final organizerCount = members.where((m) => m.isOrganizer).length;
         return Scaffold(
           backgroundColor: Colors.transparent,
           floatingActionButton: isOrganizer
@@ -55,7 +56,11 @@ class MembersTab extends ConsumerWidget {
                   event: event,
                   member: m,
                   isMe: m.userId == myId,
-                  canManage: isOrganizer || m.userId == myId,
+                  // You can manage (remove/leave) if you're an organizer or it's
+                  // your own row — EXCEPT the last organizer can't be removed or
+                  // leave, since that would orphan the event. (DB enforces too.)
+                  canManage: (isOrganizer || m.userId == myId) &&
+                      !(m.isOrganizer && organizerCount <= 1),
                 ),
             ],
           ),

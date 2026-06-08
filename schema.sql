@@ -289,6 +289,61 @@ create trigger trg_add_creator_as_organizer
   for each row execute function public.add_creator_as_organizer();
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- LAST-ORGANIZER GUARD — an event must always keep at least one organizer, or
+-- it becomes an orphan: nobody can edit/delete it (those policies require
+-- is_event_organizer). Refuse to remove (DELETE) or demote (UPDATE role away
+-- from 'organizer') the event's only remaining organizer.
+--
+-- Skips when the parent event is already gone (cascade delete of the event
+-- removes its members; that's legitimate, not an orphaning).
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.reject_last_organizer_removal()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_other_organizers int;
+begin
+  -- Only relevant if the OLD row was an organizer.
+  if old.role <> 'organizer' then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
+  -- On UPDATE, if the row stays an organizer there's nothing to guard.
+  if tg_op = 'UPDATE' and new.role = 'organizer' then
+    return new;
+  end if;
+
+  -- If the event itself is gone (cascade), allow the row to go with it.
+  if not exists (select 1 from public.events e where e.id = old.event_id) then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
+  select count(*) into v_other_organizers
+  from public.event_members m
+  where m.event_id = old.event_id
+    and m.role = 'organizer'
+    and m.user_id <> old.user_id;
+
+  if v_other_organizers = 0 then
+    raise exception
+      'cannot remove or demote the last organizer of event % (an event must keep at least one organizer)',
+      old.event_id
+      using errcode = 'check_violation';
+  end if;
+
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+
+drop trigger if exists trg_reject_last_organizer on public.event_members;
+create trigger trg_reject_last_organizer
+  before delete or update of role on public.event_members
+  for each row execute function public.reject_last_organizer_removal();
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- updated_at maintenance
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.touch_updated_at()

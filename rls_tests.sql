@@ -243,6 +243,31 @@ begin
   select count(*) into n from public.events where id=ev_crew;
   if n <> 0 then raise exception '❌ CARDINAL: crew co-membership must not expose a surprise to its target'; end if;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 10 — LAST-ORGANIZER GUARD. An event must always keep ≥1 organizer, or
+  -- it orphans (nobody can edit/delete it). ev_trip was created by Alice, so she
+  -- is its sole organizer.
+  -- ════════════════════════════════════════════════════════════════════════
+  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+
+  -- The sole organizer cannot LEAVE (delete their own member row).
+  ok := false;
+  begin delete from public.event_members where event_id=ev_trip and user_id=alice;
+  exception when others then ok := true; end;
+  if not ok then raise exception '❌ ASSERTION FAILED: the last organizer must not be able to leave (would orphan the event)'; end if;
+
+  -- The sole organizer cannot be DEMOTED to member either.
+  ok := false;
+  begin update public.event_members set role='member' where event_id=ev_trip and user_id=alice;
+  exception when others then ok := true; end;
+  if not ok then raise exception '❌ ASSERTION FAILED: the last organizer must not be demotable (would orphan the event)'; end if;
+
+  -- With a SECOND organizer present, the first may then leave.
+  insert into public.event_members (event_id,user_id,role,added_by) values (ev_trip,bob,'organizer',alice);
+  delete from public.event_members where event_id=ev_trip and user_id=alice;  -- now allowed
+  if exists (select 1 from public.event_members where event_id=ev_trip and user_id=alice) then
+    raise exception '❌ ASSERTION FAILED: organizer should be removable once another organizer exists'; end if;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);
