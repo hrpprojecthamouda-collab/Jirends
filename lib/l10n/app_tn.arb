@@ -155,6 +155,7 @@
   "createFieldDescription": "Wasf (ikhtiyari)",
   "createFieldStarts": "Ybda",
   "createFieldEnds": "Yekmel",
+  "createFieldDate": "Date",
   "createFieldLocation": "Blasa (ikhtiyari)",
   "createPickDate": "Ekhtar date",
   "createSubmit": "A3mel el-mnasba",

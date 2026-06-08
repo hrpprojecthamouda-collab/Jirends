@@ -45,7 +45,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     super.dispose();
   }
 
-  Future<void> _pickDate({required bool isStart}) async {
+  /// Trip-only: pick a day for the start or end of the range (no time).
+  Future<void> _pickRangeDate({required bool isStart}) async {
     final now = DateTime.now();
     final initial = (isStart ? _startsAt : _endsAt) ?? _startsAt ?? now;
     final picked = await showDatePicker(
@@ -58,7 +59,6 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     setState(() {
       if (isStart) {
         _startsAt = picked;
-        // Keep end >= start.
         if (_endsAt != null && _endsAt!.isBefore(picked)) _endsAt = picked;
       } else {
         _endsAt = picked;
@@ -66,11 +66,36 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     });
   }
 
+  /// Non-trip: pick a single date + time -> starts_at (ends_at stays null).
+  Future<void> _pickDateTime() async {
+    final now = DateTime.now();
+    final day = await showDatePicker(
+      context: context,
+      initialDate: _startsAt ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (day == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_startsAt ?? now),
+    );
+    setState(() {
+      _startsAt = DateTime(
+          day.year, day.month, day.day, time?.hour ?? 0, time?.minute ?? 0);
+      _endsAt = null; // non-trips never carry an end
+    });
+  }
+
+  bool get _isTrip => _type == EventType.trip;
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    // Only trips carry an end date.
+    final endsAt = _isTrip ? _endsAt : null;
     // Defensive: the DB enforces this too (events_time_order), but catch it
     // before the round-trip.
-    if (_startsAt != null && _endsAt != null && _endsAt!.isBefore(_startsAt!)) {
+    if (_startsAt != null && endsAt != null && endsAt.isBefore(_startsAt!)) {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(SnackBar(
@@ -83,7 +108,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           eventType: _type,
           description: _description.text.trim(),
           startsAt: _startsAt,
-          endsAt: _endsAt,
+          endsAt: endsAt,
           location: _location.text.trim(),
           surpriseTarget: _surpriseTarget?.id,
         );
@@ -155,7 +180,11 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                   selected: {_type},
                   onSelectionChanged: loading
                       ? null
-                      : (s) => setState(() => _type = s.first),
+                      : (s) => setState(() {
+                            _type = s.first;
+                            // Non-trips have no end date; drop it on switch.
+                            if (_type != EventType.trip) _endsAt = null;
+                          }),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -169,27 +198,44 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _DateField(
-                        label: t.createFieldStarts,
-                        emptyText: t.createPickDate,
-                        value: _startsAt,
-                        onTap: loading ? null : () => _pickDate(isStart: true),
+                // Trips span a range (two day fields); everything else is a
+                // single date + time.
+                if (_isTrip)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DateField(
+                          label: t.createFieldStarts,
+                          emptyText: t.createPickDate,
+                          value: _startsAt,
+                          dateOnly: true,
+                          onTap: loading
+                              ? null
+                              : () => _pickRangeDate(isStart: true),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _DateField(
-                        label: t.createFieldEnds,
-                        emptyText: t.createPickDate,
-                        value: _endsAt,
-                        onTap: loading ? null : () => _pickDate(isStart: false),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _DateField(
+                          label: t.createFieldEnds,
+                          emptyText: t.createPickDate,
+                          value: _endsAt,
+                          dateOnly: true,
+                          onTap: loading
+                              ? null
+                              : () => _pickRangeDate(isStart: false),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  )
+                else
+                  _DateField(
+                    label: t.createFieldDate,
+                    emptyText: t.createPickDate,
+                    value: _startsAt,
+                    dateOnly: false,
+                    onTap: loading ? null : _pickDateTime,
+                  ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _location,
@@ -297,6 +343,7 @@ class _DateField extends StatelessWidget {
     required this.emptyText,
     required this.value,
     required this.onTap,
+    this.dateOnly = true,
   });
 
   final String label;
@@ -304,12 +351,17 @@ class _DateField extends StatelessWidget {
   final DateTime? value;
   final VoidCallback? onTap;
 
+  /// When false, the displayed value includes the time (date + HH:mm).
+  final bool dateOnly;
+
   @override
   Widget build(BuildContext context) {
-    final text = value == null
+    final v = value;
+    final text = v == null
         ? emptyText
-        : '${value!.day.toString().padLeft(2, '0')}/'
-            '${value!.month.toString().padLeft(2, '0')}/${value!.year}';
+        : dateOnly
+            ? '${_pad(v.day)}/${_pad(v.month)}/${v.year}'
+            : '${_pad(v.day)}/${_pad(v.month)}/${v.year}  ${_pad(v.hour)}:${_pad(v.minute)}';
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -325,4 +377,6 @@ class _DateField extends StatelessWidget {
       ),
     );
   }
+
+  static String _pad(int n) => n.toString().padLeft(2, '0');
 }

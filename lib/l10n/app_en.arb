@@ -167,6 +167,7 @@
   "createFieldDescription": "Description (optional)",
   "createFieldStarts": "Starts",
   "createFieldEnds": "Ends",
+  "createFieldDate": "Date",
   "createFieldLocation": "Location (optional)",
   "createPickDate": "Pick a date",
   "createSubmit": "Create event",

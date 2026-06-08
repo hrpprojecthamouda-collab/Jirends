@@ -50,4 +50,9 @@ abstract class Event with _$Event {
   factory Event.fromJson(Map<String, dynamic> json) => _$EventFromJson(json);
 
   bool get isSurprise => surpriseTarget != null;
+
+  /// Only trips span a date RANGE (starts_at -> ends_at). Every other type
+  /// happens at a single date+time (stored in starts_at; ends_at stays null).
+  /// This is a UI/semantic rule — the DB columns are unchanged.
+  bool get isTrip => eventType == EventType.trip;
 }

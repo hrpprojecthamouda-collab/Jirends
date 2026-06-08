@@ -154,6 +154,7 @@
   "createFieldDescription": "Description (facultatif)",
   "createFieldStarts": "Début",
   "createFieldEnds": "Fin",
+  "createFieldDate": "Date",
   "createFieldLocation": "Lieu (facultatif)",
   "createPickDate": "Choisir une date",
   "createSubmit": "Créer l’événement",

@@ -91,14 +91,19 @@ class EventCard extends StatelessWidget {
   String? _dateRange() {
     final s = event.startsAt?.toLocal();
     if (s == null) return null;
-    final start = _fmt(s);
-    final e = event.endsAt?.toLocal();
-    if (e == null) return start;
-    return '$start → ${_fmt(e)}';
+    // Trips show a day range; other types show their single date + time.
+    if (event.isTrip) {
+      final e = event.endsAt?.toLocal();
+      return e == null ? _fmt(s) : '${_fmt(s)} → ${_fmt(e)}';
+    }
+    return '${_fmt(s)} ${_hm(s)}';
   }
 
   static String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+
+  static String _hm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   static String _titleCase(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).replaceAll('_', ' ');

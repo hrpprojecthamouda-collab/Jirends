@@ -128,8 +128,12 @@ class OverviewTab extends ConsumerWidget {
 String _fmtDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-/// The "When" row. Display shows the date range (or a prompt). For organizers,
-/// tapping opens start/end date pickers and saves via the edit controller.
+String _fmtDateTime(DateTime d) =>
+    '${_fmtDate(d)}  ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+/// The "When" row. For a TRIP it shows a date range and edits start+end days;
+/// for any other type it shows a single date+time and edits that (ends_at stays
+/// null). Organizer-only editing; saves via the edit controller.
 class _DatesRow extends ConsumerWidget {
   const _DatesRow({required this.event, required this.canEdit});
   final Event event;
@@ -140,9 +144,14 @@ class _DatesRow extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final s = event.startsAt?.toLocal();
     final e = event.endsAt?.toLocal();
-    final text = s == null
-        ? t.detailWhen
-        : (e == null ? _fmtDate(s) : '${_fmtDate(s)} → ${_fmtDate(e)}');
+    final String text;
+    if (s == null) {
+      text = t.detailWhen;
+    } else if (event.isTrip) {
+      text = e == null ? _fmtDate(s) : '${_fmtDate(s)} → ${_fmtDate(e)}';
+    } else {
+      text = _fmtDateTime(s);
+    }
     final hasValue = s != null;
 
     final row = Row(
@@ -161,13 +170,14 @@ class _DatesRow extends ConsumerWidget {
 
     if (!canEdit) return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: row);
     return InkWell(
-      onTap: () => _editDates(context, ref),
+      onTap: () => event.isTrip ? _editRange(context, ref) : _editSingle(context, ref),
       borderRadius: BorderRadius.circular(8),
       child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: row),
     );
   }
 
-  Future<void> _editDates(BuildContext context, WidgetRef ref) async {
+  // Trip: start + end days, no time.
+  Future<void> _editRange(BuildContext context, WidgetRef ref) async {
     final now = DateTime.now();
     final start = await showDatePicker(
       context: context,
@@ -184,12 +194,34 @@ class _DatesRow extends ConsumerWidget {
       lastDate: DateTime(now.year + 5),
       helpText: AppLocalizations.of(context).createFieldEnds,
     );
-    // end may be null (single-day); that's fine.
     await ref.read(editEventControllerProvider.notifier).save(
           event.id,
           startsAt: start,
           endsAt: end,
           clearEndsAt: end == null,
+        );
+  }
+
+  // Non-trip: single date + time -> starts_at; ends_at always cleared.
+  Future<void> _editSingle(BuildContext context, WidgetRef ref) async {
+    final now = DateTime.now();
+    final day = await showDatePicker(
+      context: context,
+      initialDate: event.startsAt?.toLocal() ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (day == null || !context.mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(event.startsAt?.toLocal() ?? now),
+    );
+    final dt = DateTime(
+        day.year, day.month, day.day, time?.hour ?? 0, time?.minute ?? 0);
+    await ref.read(editEventControllerProvider.notifier).save(
+          event.id,
+          startsAt: dt,
+          clearEndsAt: true,
         );
   }
 }
