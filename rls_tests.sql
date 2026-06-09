@@ -268,6 +268,54 @@ begin
   if exists (select 1 from public.event_members where event_id=ev_trip and user_id=alice) then
     raise exception '❌ ASSERTION FAILED: organizer should be removable once another organizer exists'; end if;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 11 — POLLS. Members vote (one each); creator closes; vote privacy is
+  -- own-only while OPEN and full after CLOSE; the surprise target sees nothing.
+  -- Uses the surprise event `ev` (target=Dave; members Bob & Carol).
+  -- ════════════════════════════════════════════════════════════════════════
+  declare
+    pmaj uuid; o1 uuid; o2 uuid; w uuid; tie boolean;
+  begin
+    -- Bob (a member) creates a general majority poll with two options.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    insert into public.polls (event_id,question,kind,mode,created_by)
+      values (ev,'Pizza or sushi?','general','majority',bob) returning id into pmaj;
+    insert into public.poll_options (poll_id,event_id,label,position) values (pmaj,ev,'Pizza',1) returning id into o1;
+    insert into public.poll_options (poll_id,event_id,label,position) values (pmaj,ev,'Sushi',2) returning id into o2;
+
+    -- Bob and Carol vote Pizza; a second vote by Bob is rejected (one per member).
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o1,bob);
+    ok := false;
+    begin insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o2,bob);
+    exception when unique_violation then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: a member must not vote twice in a poll'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o1,carol);
+
+    -- While OPEN, Carol can't read Bob's vote row (but can read her own).
+    select count(*) into n from public.poll_votes where poll_id=pmaj and user_id=bob;
+    if n <> 0 then raise exception '❌ ASSERTION FAILED: open poll must not reveal another member''s vote'; end if;
+
+    -- CARDINAL: the surprise target (Dave) sees no poll at all.
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into n from public.polls where id=pmaj;
+    if n <> 0 then raise exception '❌ CARDINAL: surprise target must not see the event''s polls'; end if;
+
+    -- Non-creator (Carol) cannot close; creator (Bob) closes -> Pizza wins (2-0).
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    ok := false; begin perform public.close_poll(pmaj); exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: only the poll creator may close it'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    perform public.close_poll(pmaj);
+    select winning_option_id, is_tie into w, tie from public.polls where id=pmaj;
+    if w <> o1 or tie then raise exception '❌ ASSERTION FAILED: majority winner should be Pizza, no tie'; end if;
+
+    -- After CLOSE, Carol can now read Bob's vote (full transparency).
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    select count(*) into n from public.poll_votes where poll_id=pmaj and user_id=bob;
+    if n <> 1 then raise exception '❌ ASSERTION FAILED: closed poll must reveal all votes'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);

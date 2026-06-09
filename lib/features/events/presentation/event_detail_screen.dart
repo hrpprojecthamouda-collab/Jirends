@@ -26,6 +26,7 @@ import 'tabs/files_tab.dart';
 import 'tabs/items_tab.dart';
 import 'tabs/members_tab.dart';
 import 'tabs/overview_tab.dart';
+import 'tabs/polls_tab.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   const EventDetailScreen({super.key, required this.eventId});
@@ -122,7 +123,7 @@ class _DetailScaffold extends ConsumerWidget {
         members.where((m) => m.userId == myId).firstOrNull;
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         // ── JIRA-ticket header row: back (auto) + Attachment + ⋮ + RSVP ──
         appBar: AppBar(
@@ -198,6 +199,7 @@ class _DetailScaffold extends ConsumerWidget {
                     Tab(text: t.detailTabOverview),
                     Tab(text: t.detailTabMembers),
                     Tab(text: t.detailTabItems),
+                    Tab(text: t.detailTabPolls),
                     Tab(text: t.detailTabComments),
                     Tab(text: t.detailTabFiles),
                   ],
@@ -211,6 +213,7 @@ class _DetailScaffold extends ConsumerWidget {
             OverviewTab(event: event),
             MembersTab(event: event),
             ItemsTab(eventId: event.id),
+            PollsTab(eventId: event.id),
             CommentsTab(eventId: event.id),
             FilesTab(eventId: event.id),
           ],
