@@ -56,9 +56,12 @@ class PollsTab extends ConsumerWidget {
                       style: const TextStyle(color: AppColors.inkMuted)),
                 ),
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                children: [for (final v in polls) PollCard(view: v)],
+            : RefreshIndicator(
+                onRefresh: () async => ref.invalidate(eventPollsProvider(eventId)),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                  children: [for (final v in polls) PollCard(view: v)],
+                ),
               ),
       ),
     );

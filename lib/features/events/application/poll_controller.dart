@@ -4,12 +4,19 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/supabase/supabase_providers.dart';
 import '../data/poll.dart';
 import '../data/poll_repository.dart';
 
+/// One-shot fetch of an event's composed poll views. A FutureProvider (not a
+/// realtime stream): the polls list is built from several queries + RPCs, and a
+/// realtime event on `polls` alone wouldn't reliably re-fire when only options
+/// or votes change. The action controller invalidates this after every write so
+/// the list refreshes deterministically.
 final eventPollsProvider =
-    StreamProvider.family<List<PollView>, String>((ref, eventId) {
-  return ref.watch(pollRepositoryProvider).watchPolls(eventId);
+    FutureProvider.family<List<PollView>, String>((ref, eventId) {
+  ref.watch(currentSessionProvider);
+  return ref.watch(pollRepositoryProvider).fetchPolls(eventId);
 });
 
 class PollActionsController extends AsyncNotifier<void> {
@@ -17,6 +24,9 @@ class PollActionsController extends AsyncNotifier<void> {
   Future<void> build() async {}
 
   PollRepository get _repo => ref.read(pollRepositoryProvider);
+
+  /// Refresh the composed poll list for an event after a write.
+  void _refresh(String eventId) => ref.invalidate(eventPollsProvider(eventId));
 
   Future<bool> create(
     String eventId, {
@@ -33,27 +43,32 @@ class PollActionsController extends AsyncNotifier<void> {
           mode: mode,
           labels: labels,
         ));
+    if (!state.hasError) _refresh(eventId);
     return !state.hasError;
   }
 
   Future<void> vote(String pollId, String eventId, String optionId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.vote(pollId, eventId, optionId));
+    if (!state.hasError) _refresh(eventId);
   }
 
-  Future<void> close(String pollId) async {
+  Future<void> close(String pollId, String eventId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.closePoll(pollId));
+    if (!state.hasError) _refresh(eventId);
   }
 
-  Future<void> reopen(String pollId) async {
+  Future<void> reopen(String pollId, String eventId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.reopenPoll(pollId));
+    if (!state.hasError) _refresh(eventId);
   }
 
-  Future<void> delete(String pollId) async {
+  Future<void> delete(String pollId, String eventId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.deletePoll(pollId));
+    if (!state.hasError) _refresh(eventId);
   }
 }
 

@@ -96,13 +96,13 @@ class PollCard extends ConsumerWidget {
                 children: [
                   if (poll.isOpen)
                     FilledButton.icon(
-                      onPressed: () => actions.close(poll.id),
+                      onPressed: () => actions.close(poll.id, poll.eventId),
                       icon: const Icon(Icons.how_to_vote, size: 18),
                       label: Text(t.pollClose),
                     )
                   else
                     OutlinedButton.icon(
-                      onPressed: () => actions.reopen(poll.id),
+                      onPressed: () => actions.reopen(poll.id, poll.eventId),
                       icon: const Icon(Icons.refresh, size: 18),
                       label: Text(t.pollReopen),
                     ),
@@ -111,7 +111,7 @@ class PollCard extends ConsumerWidget {
                     tooltip: t.pollDelete,
                     icon: const Icon(Icons.delete_outline,
                         color: AppColors.inkMuted),
-                    onPressed: () => actions.delete(poll.id),
+                    onPressed: () => actions.delete(poll.id, poll.eventId),
                   ),
                 ],
               ),

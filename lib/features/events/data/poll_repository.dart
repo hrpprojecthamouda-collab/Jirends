@@ -39,16 +39,6 @@ class PollRepository {
 
   String? get _uid => _client.auth.currentUser?.id;
 
-  /// Live stream of an event's polls (fully composed). Re-fetches the whole set
-  /// whenever the polls/options/votes for this event change.
-  Stream<List<PollView>> watchPolls(String eventId) {
-    return _client
-        .from('polls')
-        .stream(primaryKey: ['id'])
-        .eq('event_id', eventId)
-        .asyncMap((_) => fetchPolls(eventId));
-  }
-
   Future<List<PollView>> fetchPolls(String eventId) async {
     final uid = _uid;
     try {
