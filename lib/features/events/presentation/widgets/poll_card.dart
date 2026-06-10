@@ -89,39 +89,42 @@ class PollCard extends ConsumerWidget {
                 ),
               ),
 
-            // Creator controls. Wrapped in a width-bounded SizedBox + spaceBetween
-            // (no Spacer): the card's Column can be given unbounded width during
-            // an intrinsic pass, and a Spacer/non-flex button in a Row then gets
-            // infinite width -> "BoxConstraints forces an infinite width" (the
-            // exact crash, at the FilledButton below). Binding the row width and
-            // dropping the flex Spacer removes it.
+            // Creator controls. We deliberately AVOID Material buttons
+            // (FilledButton/OutlinedButton/IconButton): their internal
+            // _RenderInputPadding (min tap-target) throws "BoxConstraints forces
+            // an infinite width" when the card is measured for intrinsic width
+            // — which is exactly the creator-only crash this card hit. Plain
+            // tappable chips have no _RenderInputPadding and size cleanly.
             if (isCreator) ...[
               const Divider(height: 20, color: AppColors.outline),
-              SizedBox(
-                width: double.infinity,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (poll.isOpen)
-                      FilledButton.icon(
-                        onPressed: () => actions.close(poll.id, poll.eventId),
-                        icon: const Icon(Icons.how_to_vote, size: 18),
-                        label: Text(t.pollClose),
-                      )
-                    else
-                      OutlinedButton.icon(
-                        onPressed: () => actions.reopen(poll.id, poll.eventId),
-                        icon: const Icon(Icons.refresh, size: 18),
-                        label: Text(t.pollReopen),
-                      ),
-                    IconButton(
-                      tooltip: t.pollDelete,
-                      icon: const Icon(Icons.delete_outline,
-                          color: AppColors.inkMuted),
-                      onPressed: () => actions.delete(poll.id, poll.eventId),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (poll.isOpen)
+                    _ActionChip(
+                      icon: Icons.how_to_vote,
+                      label: t.pollClose,
+                      color: AppColors.violet,
+                      filled: true,
+                      onTap: () => actions.close(poll.id, poll.eventId),
+                    )
+                  else
+                    _ActionChip(
+                      icon: Icons.refresh,
+                      label: t.pollReopen,
+                      color: AppColors.violet,
+                      filled: false,
+                      onTap: () => actions.reopen(poll.id, poll.eventId),
                     ),
-                  ],
-                ),
+                  _ActionChip(
+                    icon: Icons.delete_outline,
+                    label: t.pollDelete,
+                    color: AppColors.coral,
+                    filled: false,
+                    iconOnly: true,
+                    onTap: () => actions.delete(poll.id, poll.eventId),
+                  ),
+                ],
               ),
             ],
           ],
@@ -182,6 +185,58 @@ class PollCard extends ConsumerWidget {
                 .labelSmall
                 ?.copyWith(color: color, fontWeight: FontWeight.w600)),
       );
+}
+
+/// A small tappable chip used for the creator's poll actions. Plain
+/// InkWell+Container (no Material button), so it carries no _RenderInputPadding
+/// and lays out cleanly even under an intrinsic-width measurement.
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.filled,
+    required this.onTap,
+    this.iconOnly = false,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool filled;
+  final bool iconOnly;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+            horizontal: iconOnly ? 8 : 12, vertical: 8),
+        decoration: BoxDecoration(
+          // ignore: deprecated_member_use
+          color: filled ? color.withOpacity(0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            if (!iconOnly) ...[
+              const SizedBox(width: 6),
+              Text(label,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(color: color, fontWeight: FontWeight.w700)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _OptionRow extends StatelessWidget {

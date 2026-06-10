@@ -71,6 +71,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('creator PollCard survives an intrinsic-width measurement',
+      (tester) async {
+    // IntrinsicWidth forces a maxIntrinsicWidth query down the card — the exact
+    // pass that made the old FilledButton's _RenderInputPadding throw
+    // "BoxConstraints forces an infinite width" in the creator view.
+    await tester.pumpWidget(ProviderScope(
+      overrides: [currentUserIdProvider.overrideWithValue('me')],
+      child: MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          ...tnAwareFrameworkDelegates,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: IntrinsicWidth(child: PollCard(view: _view())),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('closed weighted_random PollCard (wheel) lays out', (tester) async {
     await tester.pumpWidget(
         _host(PollCard(view: _view(closed: true, mode: PollMode.weightedRandom))));
