@@ -16,8 +16,17 @@ import '../../data/poll_repository.dart';
 import 'poll_wheel.dart';
 
 class PollCard extends ConsumerWidget {
-  const PollCard({super.key, required this.view});
+  const PollCard({
+    super.key,
+    required this.view,
+    this.isEventOrganizer = false,
+  });
   final PollView view;
+
+  /// Whether the current user is an organizer of the event. An organizer may
+  /// delete ANY poll (not just their own) — but only the poll's creator may
+  /// close/reopen it.
+  final bool isEventOrganizer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,6 +34,7 @@ class PollCard extends ConsumerWidget {
     final myId = ref.watch(currentUserIdProvider);
     final poll = view.poll;
     final isCreator = poll.createdBy == myId;
+    final canDelete = isCreator || isEventOrganizer;
     final actions = ref.read(pollActionsControllerProvider.notifier);
 
     return Card(
@@ -89,33 +99,39 @@ class PollCard extends ConsumerWidget {
                 ),
               ),
 
-            // Creator controls. We deliberately AVOID Material buttons
-            // (FilledButton/OutlinedButton/IconButton): their internal
+            // Controls. The poll's CREATOR can close/reopen it; the event
+            // ORGANIZER (even if not the poll's creator) can delete it. The DB
+            // (polls_delete_creator: created_by = uid OR is_event_organizer)
+            // enforces the same.
+            //
+            // We deliberately AVOID Material buttons here: their internal
             // _RenderInputPadding (min tap-target) throws "BoxConstraints forces
-            // an infinite width" when the card is measured for intrinsic width
-            // — which is exactly the creator-only crash this card hit. Plain
-            // tappable chips have no _RenderInputPadding and size cleanly.
-            if (isCreator) ...[
+            // an infinite width" when the card is measured for intrinsic width.
+            // Plain tappable chips have no _RenderInputPadding and size cleanly.
+            if (canDelete) ...[
               const Divider(height: 20, color: AppColors.outline),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: isCreator
+                    ? MainAxisAlignment.spaceBetween
+                    : MainAxisAlignment.end,
                 children: [
-                  if (poll.isOpen)
-                    _ActionChip(
-                      icon: Icons.how_to_vote,
-                      label: t.pollClose,
-                      color: AppColors.violet,
-                      filled: true,
-                      onTap: () => actions.close(poll.id, poll.eventId),
-                    )
-                  else
-                    _ActionChip(
-                      icon: Icons.refresh,
-                      label: t.pollReopen,
-                      color: AppColors.violet,
-                      filled: false,
-                      onTap: () => actions.reopen(poll.id, poll.eventId),
-                    ),
+                  if (isCreator)
+                    if (poll.isOpen)
+                      _ActionChip(
+                        icon: Icons.how_to_vote,
+                        label: t.pollClose,
+                        color: AppColors.violet,
+                        filled: true,
+                        onTap: () => actions.close(poll.id, poll.eventId),
+                      )
+                    else
+                      _ActionChip(
+                        icon: Icons.refresh,
+                        label: t.pollReopen,
+                        color: AppColors.violet,
+                        filled: false,
+                        onTap: () => actions.reopen(poll.id, poll.eventId),
+                      ),
                   _ActionChip(
                     icon: Icons.delete_outline,
                     label: t.pollDelete,

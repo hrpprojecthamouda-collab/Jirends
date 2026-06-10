@@ -63,7 +63,10 @@ class PollsTab extends ConsumerWidget {
               )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                children: [for (final v in polls) PollCard(view: v)],
+                children: [
+                  for (final v in polls)
+                    PollCard(view: v, isEventOrganizer: isOrganizer),
+                ],
               ),
       ),
     );
