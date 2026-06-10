@@ -316,6 +316,42 @@ begin
     if n <> 1 then raise exception '❌ ASSERTION FAILED: closed poll must reveal all votes'; end if;
   end;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 12 — COMMENT DISCUSSIONS. Replies (parent_id) form a two-level thread;
+  -- any member may name it; the surprise target sees none of it.
+  -- (Uses the surprise event `ev`: members Bob & Carol, target Dave.)
+  -- ════════════════════════════════════════════════════════════════════════
+  declare
+    droot uuid; drep uuid; dcnt int;
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    insert into public.comments (event_id,author_id,body) values (ev,bob,'Where to eat?') returning id into droot;
+    -- Carol (a different member) replies -> discussion starts.
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    insert into public.comments (event_id,author_id,body,parent_id) values (ev,carol,'Tacos',droot) returning id into drep;
+    select rc.n into dcnt from public.comment_reply_counts(ev) rc where rc.parent_id = droot;
+    if dcnt <> 1 then raise exception '❌ ASSERTION FAILED: reply count should be 1'; end if;
+
+    -- Two-level: replying to a reply is rejected.
+    ok := false;
+    begin insert into public.comments (event_id,author_id,body,parent_id) values (ev,carol,'nested',drep);
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: reply-to-reply must be rejected (two-level only)'; end if;
+
+    -- thread_title on a reply rejected; any member may title the ROOT.
+    ok := false;
+    begin update public.comments set thread_title='X' where id=drep; exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: thread_title on a reply must be rejected'; end if;
+    update public.comments set thread_title='Dinner venue' where id=droot;  -- Carol is not the root author; still allowed
+    if (select thread_title from public.comments where id=droot) <> 'Dinner venue' then
+      raise exception '❌ ASSERTION FAILED: any member should be able to name the discussion'; end if;
+
+    -- CARDINAL: the surprise target (Dave) sees no discussion comments or counts.
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into n from public.comments where event_id=ev;
+    if n <> 0 then raise exception '❌ CARDINAL: surprise target must not read the discussion'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);

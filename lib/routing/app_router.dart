@@ -22,9 +22,11 @@ import '../features/auth/data/profile_repository.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
+import '../features/events/data/comment.dart';
 import '../features/events/presentation/events_list_screen.dart';
 import '../features/events/presentation/create_event_screen.dart';
 import '../features/events/presentation/event_detail_screen.dart';
+import '../features/events/presentation/discussion_screen.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/groups/presentation/groups_screen.dart';
 import '../features/groups/presentation/group_detail_screen.dart';
@@ -55,6 +57,11 @@ class AppRoutes {
 
   /// Detail route for one event. Path: /events/:id
   static String eventDetail(String id) => '/events/$id';
+
+  /// Discussion route for one comment. Path: /events/:id/discussion/:rootId
+  /// (pass the root Comment via extra to avoid a re-fetch).
+  static String discussion(String eventId, String rootId) =>
+      '/events/$eventId/discussion/$rootId';
 
   /// Detail routes within the Groups branch.
   static String groupDetail(String id) => '/groups/group/$id';
@@ -140,6 +147,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: ':id',
                   builder: (context, state) =>
                       EventDetailScreen(eventId: state.pathParameters['id']!),
+                  routes: [
+                    GoRoute(
+                      path: 'discussion/:rootId',
+                      builder: (context, state) => DiscussionScreen(
+                        eventId: state.pathParameters['id']!,
+                        rootId: state.pathParameters['rootId']!,
+                        rootComment: state.extra as Comment?,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

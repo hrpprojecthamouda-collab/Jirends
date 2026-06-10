@@ -5,13 +5,15 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/supabase/supabase_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../routing/app_router.dart';
 import '../../../auth/application/auth_controller.dart';
 import '../../application/comment_controller.dart';
-import '../../data/comment.dart';
+import '../../data/comment_repository.dart';
 import '../../data/reaction.dart';
 import '../widgets/reaction_bar.dart';
 
@@ -76,13 +78,13 @@ class _CommentsTabState extends ConsumerState<CommentsTab> {
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                     itemCount: comments.length,
                     itemBuilder: (context, i) {
-                      final c = comments[i];
+                      final root = comments[i];
                       return _CommentTile(
                         eventId: widget.eventId,
-                        comment: c,
+                        root: root,
                         myId: myId,
                         reactions: reactions
-                            .where((r) => r.commentId == c.id)
+                            .where((r) => r.commentId == root.comment.id)
                             .toList(),
                       );
                     },
@@ -127,73 +129,174 @@ class _CommentsTabState extends ConsumerState<CommentsTab> {
   }
 }
 
+/// A top-level comment. TAP opens its discussion; LONG-PRESS names/renames it
+/// (any member). The footer (title + reply count) appears once a discussion
+/// exists (≥1 reply or a title).
 class _CommentTile extends ConsumerWidget {
   const _CommentTile({
     required this.eventId,
-    required this.comment,
+    required this.root,
     required this.myId,
     required this.reactions,
   });
   final String eventId;
-  final Comment comment;
+  final RootComment root;
   final String? myId;
   final List<Reaction> reactions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
+    final comment = root.comment;
     final isMine = comment.authorId == myId;
     final handle = comment.author.handle ?? '…';
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(isMine ? '$handle (${t.youLabel})' : handle,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: AppColors.violet, fontWeight: FontWeight.w700)),
-                ),
-                Text(_time(comment.createdAt.toLocal()),
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelSmall
-                        ?.copyWith(color: AppColors.inkMuted)),
-                if (isMine)
-                  InkWell(
-                    onTap: () => ref
-                        .read(commentActionsControllerProvider.notifier)
-                        .delete(comment.id),
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: Icon(Icons.close,
-                          size: 16, color: AppColors.inkMuted),
-                    ),
+      child: InkWell(
+        onTap: () => context.push(
+            AppRoutes.discussion(eventId, comment.id),
+            extra: comment),
+        onLongPress: () => _renameDiscussion(context, ref),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(isMine ? '$handle (${t.youLabel})' : handle,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: AppColors.violet,
+                            fontWeight: FontWeight.w700)),
                   ),
+                  Text(_time(comment.createdAt.toLocal()),
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: AppColors.inkMuted)),
+                  if (isMine)
+                    InkWell(
+                      onTap: () => ref
+                          .read(commentActionsControllerProvider.notifier)
+                          .delete(comment.id),
+                      child: const Padding(
+                        padding: EdgeInsets.only(left: 8),
+                        child: Icon(Icons.close,
+                            size: 16, color: AppColors.inkMuted),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(comment.body),
+              const SizedBox(height: 8),
+              ReactionBar(
+                reactions: reactions,
+                myUserId: myId,
+                onToggle: (emoji) => ref
+                    .read(commentActionsControllerProvider.notifier)
+                    .toggleReaction(eventId, commentId: comment.id, emoji: emoji),
+              ),
+              // Discussion footer: title + reply count (once a discussion exists).
+              if (root.hasDiscussion) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.forum_outlined,
+                        size: 14, color: AppColors.blue),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        comment.threadTitle?.isNotEmpty == true
+                            ? comment.threadTitle!
+                            : t.discussionTitleDefault,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: AppColors.blue, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(t.discussionReplies(root.replyCount),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(color: AppColors.inkMuted)),
+                    const Icon(Icons.chevron_right,
+                        size: 16, color: AppColors.inkMuted),
+                  ],
+                ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(comment.body),
-            const SizedBox(height: 8),
-            ReactionBar(
-              reactions: reactions,
-              myUserId: myId,
-              onToggle: (emoji) => ref
-                  .read(commentActionsControllerProvider.notifier)
-                  .toggleReaction(eventId,
-                      commentId: comment.id, emoji: emoji),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
+  Future<void> _renameDiscussion(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(commentActionsControllerProvider.notifier);
+    final rootId = root.comment.id;
+    final current = root.comment.threadTitle ?? '';
+    final title = await showDialog<String>(
+      context: context,
+      builder: (_) => _RenameDiscussionDialog(initial: current),
+    );
+    if (title == null) return; // cancelled
+    await notifier.setThreadTitle(rootId, title.isEmpty ? null : title);
+  }
+
   String _time(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} '
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+}
+
+/// Owns its TextEditingController (disposed in its own dispose) — avoids the
+/// dispose-after-await dialog crash.
+class _RenameDiscussionDialog extends StatefulWidget {
+  const _RenameDiscussionDialog({required this.initial});
+  final String initial;
+
+  @override
+  State<_RenameDiscussionDialog> createState() =>
+      _RenameDiscussionDialogState();
+}
+
+class _RenameDiscussionDialogState extends State<_RenameDiscussionDialog> {
+  late final TextEditingController _c =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(t.discussionRename),
+      content: TextField(
+        controller: _c,
+        autofocus: true,
+        maxLength: 120,
+        decoration:
+            InputDecoration(labelText: t.discussionTitleLabel, counterText: ''),
+        onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.commonCancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_c.text.trim()),
+          child: Text(t.commonAdd),
+        ),
+      ],
+    );
+  }
 }

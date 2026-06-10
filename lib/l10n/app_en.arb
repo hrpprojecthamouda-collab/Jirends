@@ -203,6 +203,13 @@
   "commentSend": "Send",
   "commentDelete": "Delete comment",
   "commentDeleteConfirm": "Delete this comment?",
+  "discussionTitleDefault": "Discussion",
+  "discussionReplies": "{count, plural, =0{No replies} =1{1 reply} other{{count} replies}}",
+  "@discussionReplies": { "placeholders": { "count": { "type": "int" } } },
+  "discussionRename": "Name this discussion",
+  "discussionTitleLabel": "Title",
+  "discussionReplyHint": "Write a reply…",
+  "discussionEmpty": "No replies yet. Start the discussion.",
 
   "youLabel": "you",
 

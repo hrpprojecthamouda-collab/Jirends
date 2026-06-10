@@ -188,6 +188,12 @@
   "commentSend": "Eb3ath",
   "commentDelete": "Na77i el-commentaire",
   "commentDeleteConfirm": "Na77i el-commentaire hetha?",
+  "discussionTitleDefault": "Discussion",
+  "discussionReplies": "{count, plural, =0{Famma chay jaweb} =1{1 jaweb} other{{count} jwebat}}",
+  "discussionRename": "Smi el-discussion hethi",
+  "discussionTitleLabel": "3onwan",
+  "discussionReplyHint": "Ekteb jaweb…",
+  "discussionEmpty": "Famma chay jaweb. Abda el-discussion.",
 
   "youLabel": "enti",
 

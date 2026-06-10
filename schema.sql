@@ -120,17 +120,26 @@ create table if not exists public.event_items (
 create index if not exists event_items_event_idx on public.event_items (event_id);
 
 -- ────────────────────────────────────────────────────────────────────────────
--- comments
+-- comments — top-level comments on an event, plus REPLIES that form a
+-- "discussion". A reply sets parent_id to a TOP-LEVEL comment (two-level only;
+-- enforced by trg_enforce_comment_two_levels). thread_title names the
+-- discussion and is only valid on a root comment. (Added in the
+-- comment_threads migration.)
 -- ────────────────────────────────────────────────────────────────────────────
 create table if not exists public.comments (
-  id         uuid primary key default gen_random_uuid(),
-  event_id   uuid not null references public.events(id) on delete cascade,
-  author_id  uuid not null references public.profiles(id) on delete cascade,
-  body       text not null check (char_length(body) between 1 and 4000),
-  created_at timestamptz not null default now()
+  id           uuid primary key default gen_random_uuid(),
+  event_id     uuid not null references public.events(id) on delete cascade,
+  author_id    uuid not null references public.profiles(id) on delete cascade,
+  body         text not null check (char_length(body) between 1 and 4000),
+  parent_id    uuid references public.comments(id) on delete cascade,
+  thread_title text check (thread_title is null or char_length(thread_title) between 1 and 120),
+  created_at   timestamptz not null default now()
 );
 
-create index if not exists comments_event_idx on public.comments (event_id);
+create index if not exists comments_event_idx  on public.comments (event_id);
+create index if not exists comments_parent_idx on public.comments (parent_id);
+
+-- Two-level guard + reply-count RPC live with the other comment logic below.
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- reactions — carry event_id explicitly for RLS scoping (per the cardinal rule).
@@ -344,6 +353,69 @@ create trigger trg_reject_last_organizer
   for each row execute function public.reject_last_organizer_removal();
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- COMMENT DISCUSSIONS — two-level reply guard + member-visible reply counts.
+-- A reply (parent_id not null) must point at a TOP-LEVEL comment in the same
+-- event; you cannot reply to a reply, and only a root comment may carry a
+-- thread_title.
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.enforce_comment_two_levels()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  v_parent_event uuid;
+  v_parent_parent uuid;
+begin
+  if new.parent_id is not null then
+    select event_id, parent_id into v_parent_event, v_parent_parent
+      from public.comments where id = new.parent_id;
+    if v_parent_event is null then
+      raise exception 'parent comment % does not exist', new.parent_id
+        using errcode = 'foreign_key_violation';
+    end if;
+    if v_parent_event <> new.event_id then
+      raise exception 'reply event_id must match its parent''s event'
+        using errcode = 'check_violation';
+    end if;
+    if v_parent_parent is not null then
+      raise exception 'replies are two-level only (cannot reply to a reply)'
+        using errcode = 'check_violation';
+    end if;
+    if new.thread_title is not null then
+      raise exception 'only a top-level comment may have a thread_title'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_comment_two_levels on public.comments;
+create trigger trg_enforce_comment_two_levels
+  before insert or update of parent_id, thread_title on public.comments
+  for each row execute function public.enforce_comment_two_levels();
+
+-- Reply counts per root comment for an event (member-scoped, so the comment
+-- list shows "N replies" without reading every reply row).
+create or replace function public.comment_reply_counts(p_event uuid)
+returns table(parent_id uuid, n bigint)
+language plpgsql stable security definer set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_event_member(p_event) then
+    return;
+  end if;
+  return query
+    select c.parent_id, count(*)::bigint
+    from public.comments c
+    where c.event_id = p_event and c.parent_id is not null
+    group by c.parent_id;
+end;
+$$;
+revoke all on function public.comment_reply_counts(uuid) from public;
+grant execute on function public.comment_reply_counts(uuid) to authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- updated_at maintenance
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.touch_updated_at()
@@ -506,10 +578,14 @@ create policy comments_insert on public.comments
   for insert to authenticated
   with check (public.is_event_member(event_id) and author_id = auth.uid());
 
+-- Any event member may update a comment (used for collaborative discussion
+-- thread_title naming; member-scoped). Replaces the old author-only policy.
 drop policy if exists comments_update_own on public.comments;
-create policy comments_update_own on public.comments
+drop policy if exists comments_update on public.comments;
+create policy comments_update on public.comments
   for update to authenticated
-  using (author_id = auth.uid()) with check (author_id = auth.uid());
+  using (public.is_event_member(event_id))
+  with check (public.is_event_member(event_id));
 
 drop policy if exists comments_delete on public.comments;
 create policy comments_delete on public.comments

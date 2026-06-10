@@ -11,6 +11,8 @@ part 'comment.g.dart';
 
 @freezed
 abstract class Comment with _$Comment {
+  const Comment._();
+
   const factory Comment({
     required String id,
     required String eventId,
@@ -18,8 +20,16 @@ abstract class Comment with _$Comment {
     required String body,
     required DateTime createdAt,
     required Profile author,
+    /// NULL for a top-level event comment; the root comment's id for a reply
+    /// inside that comment's discussion (two-level only).
+    String? parentId,
+    /// The discussion's name. Only meaningful on a top-level (root) comment.
+    String? threadTitle,
   }) = _Comment;
 
   factory Comment.fromJson(Map<String, dynamic> json) =>
       _$CommentFromJson(json);
+
+  /// True for a top-level event comment (not a reply).
+  bool get isRoot => parentId == null;
 }
