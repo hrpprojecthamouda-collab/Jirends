@@ -202,52 +202,59 @@ class _OptionRow extends StatelessWidget {
         ? AppColors.teal
         : (selected ? AppColors.violet : AppColors.inkMuted);
 
+    final clamped = frac.clamp(0.0, 1.0);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        child: Stack(
-          children: [
-            // Tally bar fill.
-            Positioned.fill(
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: frac == 0 ? 0.0001 : frac,
-                child: Container(
-                  decoration: BoxDecoration(
-                    // ignore: deprecated_member_use
-                    color: accent.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: selected ? AppColors.violet : AppColors.outline),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              children: [
+                // Tally bar fill — sized to a fraction of the measured width,
+                // matched to the content height by the Positioned.fill wrapper.
+                Positioned.fill(
+                  child: LayoutBuilder(
+                    builder: (context, c) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        width: c.maxWidth * clamped,
+                        // ignore: deprecated_member_use
+                        color: accent.withOpacity(0.18),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      if (selected)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 6),
+                          child: Icon(Icons.check_circle,
+                              size: 16, color: AppColors.violet),
+                        ),
+                      Expanded(child: Text(label)),
+                      Text(t.pollVotes(votes),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: AppColors.inkMuted)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: selected ? AppColors.violet : AppColors.outline),
-              ),
-              child: Row(
-                children: [
-                  if (selected)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
-                      child: Icon(Icons.check_circle,
-                          size: 16, color: AppColors.violet),
-                    ),
-                  Expanded(child: Text(label)),
-                  Text(t.pollVotes(votes),
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: AppColors.inkMuted)),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
