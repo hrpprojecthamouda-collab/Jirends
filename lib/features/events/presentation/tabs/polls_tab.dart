@@ -44,7 +44,12 @@ class PollsTab extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: Text(t.pollNew),
       ),
+      // Keep the last-loaded polls on screen while the provider re-fetches
+      // (after a vote/close it invalidates, and we don't want the list to blank
+      // to a spinner each time). Only show the spinner on the very first load.
       body: pollsAsync.when(
+        skipLoadingOnReload: true,
+        skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(messageForError(e))),
         data: (polls) => polls.isEmpty

@@ -12,7 +12,13 @@ part 'poll.g.dart';
 
 enum PollKind { general, date, place }
 
-enum PollMode { majority, weightedRandom }
+enum PollMode {
+  majority,
+  // Stored as 'weighted_random' in Postgres; json_serializable only snake-cases
+  // JSON keys, not enum values, so map it explicitly.
+  @JsonValue('weighted_random')
+  weightedRandom,
+}
 
 enum PollStatus { open, closed }
 

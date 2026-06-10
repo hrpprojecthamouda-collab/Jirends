@@ -4,7 +4,6 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/supabase/supabase_providers.dart';
 import '../data/poll.dart';
 import '../data/poll_repository.dart';
 
@@ -15,7 +14,6 @@ import '../data/poll_repository.dart';
 /// the list refreshes deterministically.
 final eventPollsProvider =
     FutureProvider.family<List<PollView>, String>((ref, eventId) {
-  ref.watch(currentSessionProvider);
   return ref.watch(pollRepositoryProvider).fetchPolls(eventId);
 });
 
