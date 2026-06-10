@@ -46,15 +46,22 @@ class _PollWheelState extends State<PollWheel>
         vsync: this, duration: const Duration(milliseconds: 2600));
 
     // Final rotation so the winning slice's centre lands under the top pointer.
+    // Defensive against bad inputs (zero total, out-of-range winner) so a
+    // rebuild during scroll can never index past the list or divide by zero.
     final total = widget.weights.fold<int>(0, (a, b) => a + b);
-    double startFraction = 0;
-    for (var i = 0; i < widget.winnerIndex; i++) {
-      startFraction += widget.weights[i] / total;
+    final n = widget.weights.length;
+    final winner =
+        (widget.winnerIndex >= 0 && widget.winnerIndex < n) ? widget.winnerIndex : 0;
+    double target = 4; // a few full turns even if we can't compute a slice
+    if (total > 0 && n > 0) {
+      double startFraction = 0;
+      for (var i = 0; i < winner; i++) {
+        startFraction += widget.weights[i] / total;
+      }
+      final winnerMidFraction =
+          startFraction + (widget.weights[winner] / total) / 2;
+      target = 4 + (0.75 - winnerMidFraction);
     }
-    final winnerMidFraction =
-        startFraction + (widget.weights[widget.winnerIndex] / total) / 2;
-    // Pointer is at top (-0.25 turn). Spin several full turns then settle.
-    final target = 4 + (0.75 - winnerMidFraction);
     _turns = Tween<double>(begin: 0, end: target).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
     );
