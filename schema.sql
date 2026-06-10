@@ -180,6 +180,29 @@ create table if not exists public.attachments (
 
 create index if not exists attachments_event_idx on public.attachments (event_id);
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- event_history — append-only change log per event (title/description/status/
+-- location/time edits + poll lifecycle). Written ONLY by SECURITY DEFINER code
+-- (trg_log_event_changes, trg_log_poll_created, and the close/reopen poll RPCs)
+-- via log_event_history(); there is no client write policy, so it is tamper-
+-- proof. RLS scopes reads to members → a surprise target sees no history.
+-- (Added in the event_history migration.)
+-- ────────────────────────────────────────────────────────────────────────────
+create table if not exists public.event_history (
+  id         uuid primary key default gen_random_uuid(),
+  event_id   uuid not null references public.events(id) on delete cascade,
+  actor_id   uuid references public.profiles(id) on delete set null,
+  kind       text not null,   -- title|description|status|location|starts_at|
+                              -- ends_at|poll_created|poll_closed|poll_reopened
+  old_value  text,
+  new_value  text,
+  detail     jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists event_history_event_idx
+  on public.event_history (event_id, created_at desc);
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- HELPER FUNCTIONS — SECURITY DEFINER on purpose. They run as the table owner,
 -- bypassing RLS *inside the function body*, which is exactly what stops the
@@ -416,6 +439,94 @@ revoke all on function public.comment_reply_counts(uuid) from public;
 grant execute on function public.comment_reply_counts(uuid) to authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- EVENT HISTORY — append-only change log. log_event_history() is the single
+-- writer (SECURITY DEFINER, bypasses the write-less RLS). A trigger on events
+-- logs watched-field edits; a trigger on polls logs creation; the close/reopen
+-- poll RPCs (polls.sql) log poll_closed(+result)/poll_reopened.
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.log_event_history(
+  p_event uuid, p_actor uuid, p_kind text,
+  p_old text, p_new text, p_detail jsonb default '{}'::jsonb)
+returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  insert into public.event_history (event_id, actor_id, kind, old_value, new_value, detail)
+  values (p_event, p_actor, p_kind, p_old, p_new, coalesce(p_detail, '{}'::jsonb));
+end;
+$$;
+
+-- Human label for a status key within the event's type (events.event_type is
+-- the event_type ENUM). Falls back to the raw key.
+create or replace function public.status_label(p_event_type public.event_type, p_key text)
+returns text
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select coalesce(
+    (select label from public.event_type_phases
+       where event_type = p_event_type and key = p_key),
+    p_key);
+$$;
+
+-- One history row per watched field that actually changed (updated_at-only or
+-- surprise_target churn logs nothing).
+create or replace function public.log_event_changes()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare a uuid := auth.uid();
+begin
+  if new.title is distinct from old.title then
+    perform public.log_event_history(new.id, a, 'title', old.title, new.title);
+  end if;
+  if new.description is distinct from old.description then
+    perform public.log_event_history(new.id, a, 'description', old.description, new.description);
+  end if;
+  if new.location is distinct from old.location then
+    perform public.log_event_history(new.id, a, 'location', old.location, new.location);
+  end if;
+  if new.status is distinct from old.status then
+    perform public.log_event_history(new.id, a, 'status',
+      public.status_label(old.event_type, old.status),
+      public.status_label(new.event_type, new.status));
+  end if;
+  if new.starts_at is distinct from old.starts_at then
+    perform public.log_event_history(new.id, a, 'starts_at',
+      to_char(old.starts_at, 'YYYY-MM-DD"T"HH24:MI:SSOF'),
+      to_char(new.starts_at, 'YYYY-MM-DD"T"HH24:MI:SSOF'));
+  end if;
+  if new.ends_at is distinct from old.ends_at then
+    perform public.log_event_history(new.id, a, 'ends_at',
+      to_char(old.ends_at, 'YYYY-MM-DD"T"HH24:MI:SSOF'),
+      to_char(new.ends_at, 'YYYY-MM-DD"T"HH24:MI:SSOF'));
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_log_event_changes on public.events;
+create trigger trg_log_event_changes
+  after update on public.events
+  for each row execute function public.log_event_changes();
+
+create or replace function public.log_poll_created()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  perform public.log_event_history(
+    new.event_id, auth.uid(), 'poll_created', null, new.question,
+    jsonb_build_object('poll_id', new.id, 'question', new.question));
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_log_poll_created on public.polls;
+create trigger trg_log_poll_created
+  after insert on public.polls
+  for each row execute function public.log_poll_created();
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- updated_at maintenance
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.touch_updated_at()
@@ -464,6 +575,7 @@ alter table public.event_items   enable row level security;
 alter table public.comments      enable row level security;
 alter table public.reactions     enable row level security;
 alter table public.attachments   enable row level security;
+alter table public.event_history enable row level security;
 
 -- ── profiles ────────────────────────────────────────────────────────────────
 -- Profiles are readable by any authenticated user (you must be able to look up
@@ -620,6 +732,15 @@ drop policy if exists attachments_delete on public.attachments;
 create policy attachments_delete on public.attachments
   for delete to authenticated
   using (uploaded_by = auth.uid() or public.is_event_organizer(event_id));
+
+-- ── event_history ───────────────────────────────────────────────────────────
+-- Members READ the change log. No insert/update/delete policy exists by design,
+-- so clients can't write or tamper with it — only the SECURITY DEFINER
+-- log_event_history() (called by triggers + the poll RPCs) writes rows.
+drop policy if exists event_history_select on public.event_history;
+create policy event_history_select on public.event_history
+  for select to authenticated
+  using (public.is_event_member(event_id));
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- STORAGE — event-attachments bucket, scoped by membership. The first path

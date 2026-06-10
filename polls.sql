@@ -261,6 +261,26 @@ begin
         winning_option_id = v_winner, is_tie = v_tie
   where id = p_poll
   returning * into v_poll;
+
+  -- Record the close (+ outcome) in the event history.
+  declare
+    v_outcome text;
+    v_label   text := null;
+  begin
+    if v_total = 0 then
+      v_outcome := 'no_votes';
+    elsif v_tie then
+      v_outcome := 'tie';
+    else
+      v_outcome := 'winner';
+      select label into v_label from public.poll_options where id = v_winner;
+    end if;
+    perform public.log_event_history(
+      v_poll.event_id, auth.uid(), 'poll_closed', null, v_label,
+      jsonb_build_object('poll_id', v_poll.id, 'question', v_poll.question,
+                         'outcome', v_outcome, 'winner_label', v_label));
+  end;
+
   return v_poll;
 end;
 $$;
@@ -285,6 +305,11 @@ begin
     set status = 'open', closed_at = null, winning_option_id = null, is_tie = false
   where id = p_poll
   returning * into v_poll;
+
+  perform public.log_event_history(
+    v_poll.event_id, auth.uid(), 'poll_reopened', null, null,
+    jsonb_build_object('poll_id', v_poll.id, 'question', v_poll.question));
+
   return v_poll;
 end;
 $$;

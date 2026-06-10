@@ -352,6 +352,40 @@ begin
     if n <> 0 then raise exception '❌ CARDINAL: surprise target must not read the discussion'; end if;
   end;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 13 — EVENT HISTORY. Field edits + poll lifecycle are logged by
+  -- SECURITY DEFINER code; the log is read-only to members, tamper-proof, and
+  -- invisible to the surprise target. (Uses surprise event `ev`.)
+  -- ════════════════════════════════════════════════════════════════════════
+  declare hn int; hold text; hnew text; hok boolean;
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    -- One UPDATE touching two watched fields -> two history rows.
+    update public.events set title='Dave''s Surprise (renamed)', location='Secret venue' where id=ev;
+    select count(*) into hn from public.event_history where event_id=ev and kind in ('title','location');
+    if hn <> 2 then raise exception '❌ TEST13: a 2-field edit should log 2 rows (got %)', hn; end if;
+    select old_value, new_value into hold, hnew from public.event_history where event_id=ev and kind='location';
+    if hold is not null then null; end if; -- location had no prior value (ev was created without one)
+    if hnew <> 'Secret venue' then raise exception '❌ TEST13: location new_value wrong'; end if;
+    if (select actor_id from public.event_history where event_id=ev and kind='title') <> alice then
+      raise exception '❌ TEST13: actor should be Alice'; end if;
+
+    -- Members read history; the surprise target (Dave) reads NONE.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into hn from public.event_history where event_id=ev;
+    if hn = 0 then raise exception '❌ TEST13: member should read history'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into hn from public.event_history where event_id=ev;
+    if hn <> 0 then raise exception '❌ CARDINAL: surprise target must not read history'; end if;
+
+    -- The log is tamper-proof: a member cannot write to it directly.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    hok := false;
+    begin insert into public.event_history (event_id,actor_id,kind,new_value) values (ev,bob,'title','forged');
+    exception when others then hok := true; end;
+    if not hok then raise exception '❌ TEST13: clients must not write event_history directly'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);

@@ -23,6 +23,7 @@ import '../data/event_member.dart';
 import '../data/event_phase.dart';
 import 'tabs/comments_tab.dart';
 import 'tabs/files_tab.dart';
+import 'tabs/history_tab.dart';
 import 'tabs/items_tab.dart';
 import 'tabs/members_tab.dart';
 import 'tabs/overview_tab.dart';
@@ -123,7 +124,7 @@ class _DetailScaffold extends ConsumerWidget {
         members.where((m) => m.userId == myId).firstOrNull;
 
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         // ── JIRA-ticket header row: back (auto) + Attachment + ⋮ + RSVP ──
         appBar: AppBar(
@@ -202,6 +203,7 @@ class _DetailScaffold extends ConsumerWidget {
                     Tab(text: t.detailTabPolls),
                     Tab(text: t.detailTabComments),
                     Tab(text: t.detailTabFiles),
+                    Tab(text: t.detailTabHistory),
                   ],
                 ),
               ],
@@ -216,6 +218,7 @@ class _DetailScaffold extends ConsumerWidget {
             PollsTab(eventId: event.id),
             CommentsTab(eventId: event.id),
             FilesTab(eventId: event.id),
+            HistoryTab(eventId: event.id),
           ],
         ),
       ),
