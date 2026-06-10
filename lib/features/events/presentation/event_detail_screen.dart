@@ -373,15 +373,17 @@ class _StatusChip extends ConsumerWidget {
       ),
     );
 
-    return Center(
-      child: canEdit
-          ? InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _advance(context, ref, phases),
-              child: chip,
-            )
-          : chip,
-    );
+    // NOTE: no Center/Align here — this chip sits as a non-flex child of the
+    // header Row, and an Align/Center child in a Row is given unbounded width,
+    // which it tries to fill -> "BoxConstraints forces an infinite width". The
+    // chip sizes itself (Row mainAxisSize.min), so return it directly.
+    return canEdit
+        ? InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _advance(context, ref, phases),
+            child: chip,
+          )
+        : chip;
   }
 
   String _labelFor(String? key, List<EventPhase> phases) {

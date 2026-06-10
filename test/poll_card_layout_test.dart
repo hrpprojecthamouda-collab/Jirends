@@ -121,6 +121,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // Root cause: a Center/Align as a NON-flex child of a Row is handed unbounded
+  // width and tries to fill it -> "forces an infinite width". This mirrors the
+  // old _StatusChip(Center(...)) inside the header Row. The fix returns the chip
+  // directly (no Center).
+  testWidgets('Center child inside a Row forces infinite width; bare child OK',
+      (tester) async {
+    Widget rowWith(Widget child) => MaterialApp(
+          home: Scaffold(
+            body: Row(children: [const Text('Trip'), const Spacer(), child]),
+          ),
+        );
+    final chip = Container(width: 60, height: 24, color: const Color(0xFF333333));
+    // Bare chip (the fix): fine.
+    await tester.pumpWidget(rowWith(chip));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('PollsTab lays out inside a TabBarView-like bounded box',
       (tester) async {
     final member = EventMember(
