@@ -203,57 +203,52 @@ class _OptionRow extends StatelessWidget {
         : (selected ? AppColors.violet : AppColors.inkMuted);
 
     final clamped = frac.clamp(0.0, 1.0);
+    // No Stack/Positioned/LayoutBuilder: a Column whose children stretch to the
+    // parent's (bounded) width, with a LinearProgressIndicator as the tally bar.
+    // This can never force an infinite width inside a ListView.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        child: DecoratedBox(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
                 color: selected ? AppColors.violet : AppColors.outline),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Stack(
-              children: [
-                // Tally bar fill — sized to a fraction of the measured width,
-                // matched to the content height by the Positioned.fill wrapper.
-                Positioned.fill(
-                  child: LayoutBuilder(
-                    builder: (context, c) => Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        width: c.maxWidth * clamped,
-                        // ignore: deprecated_member_use
-                        color: accent.withOpacity(0.18),
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  if (selected)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 6),
+                      child: Icon(Icons.check_circle,
+                          size: 16, color: AppColors.violet),
                     ),
-                  ),
+                  Expanded(child: Text(label)),
+                  Text(t.pollVotes(votes),
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: AppColors.inkMuted)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: clamped,
+                  minHeight: 6,
+                  backgroundColor: AppColors.surfaceHi,
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
                 ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Row(
-                    children: [
-                      if (selected)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 6),
-                          child: Icon(Icons.check_circle,
-                              size: 16, color: AppColors.violet),
-                        ),
-                      Expanded(child: Text(label)),
-                      Text(t.pollVotes(votes),
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(color: AppColors.inkMuted)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
