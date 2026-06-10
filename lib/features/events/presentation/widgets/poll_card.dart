@@ -89,31 +89,39 @@ class PollCard extends ConsumerWidget {
                 ),
               ),
 
-            // Creator controls.
+            // Creator controls. Wrapped in a width-bounded SizedBox + spaceBetween
+            // (no Spacer): the card's Column can be given unbounded width during
+            // an intrinsic pass, and a Spacer/non-flex button in a Row then gets
+            // infinite width -> "BoxConstraints forces an infinite width" (the
+            // exact crash, at the FilledButton below). Binding the row width and
+            // dropping the flex Spacer removes it.
             if (isCreator) ...[
               const Divider(height: 20, color: AppColors.outline),
-              Row(
-                children: [
-                  if (poll.isOpen)
-                    FilledButton.icon(
-                      onPressed: () => actions.close(poll.id, poll.eventId),
-                      icon: const Icon(Icons.how_to_vote, size: 18),
-                      label: Text(t.pollClose),
-                    )
-                  else
-                    OutlinedButton.icon(
-                      onPressed: () => actions.reopen(poll.id, poll.eventId),
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: Text(t.pollReopen),
+              SizedBox(
+                width: double.infinity,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (poll.isOpen)
+                      FilledButton.icon(
+                        onPressed: () => actions.close(poll.id, poll.eventId),
+                        icon: const Icon(Icons.how_to_vote, size: 18),
+                        label: Text(t.pollClose),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: () => actions.reopen(poll.id, poll.eventId),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: Text(t.pollReopen),
+                      ),
+                    IconButton(
+                      tooltip: t.pollDelete,
+                      icon: const Icon(Icons.delete_outline,
+                          color: AppColors.inkMuted),
+                      onPressed: () => actions.delete(poll.id, poll.eventId),
                     ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: t.pollDelete,
-                    icon: const Icon(Icons.delete_outline,
-                        color: AppColors.inkMuted),
-                    onPressed: () => actions.delete(poll.id, poll.eventId),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ],
