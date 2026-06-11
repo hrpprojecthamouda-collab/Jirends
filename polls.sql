@@ -123,6 +123,64 @@ $$;
 revoke all on function public.poll_tallies(uuid) from public;
 grant execute on function public.poll_tallies(uuid) to authenticated;
 
+-- Event-wide tallies: one round-trip for the whole polls tab instead of one
+-- poll_tallies() call per poll. Same member gate and semantics.
+create or replace function public.poll_tallies_for_event(p_event uuid)
+returns table(poll_id uuid, option_id uuid, votes bigint)
+language plpgsql stable security definer set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_event_member(p_event) then
+    return;  -- not a member: no rows
+  end if;
+  return query
+    select o.poll_id, o.id, count(v.id)::bigint
+    from public.poll_options o
+    join public.polls p on p.id = o.poll_id and p.event_id = p_event
+    left join public.poll_votes v on v.option_id = o.id
+    group by o.poll_id, o.id;
+end;
+$$;
+revoke all on function public.poll_tallies_for_event(uuid) from public;
+grant execute on function public.poll_tallies_for_event(uuid) to authenticated;
+
+-- Atomic poll creation: poll + options in one call so a failure can't leave an
+-- option-less poll behind. SECURITY INVOKER on purpose — the inserts run as
+-- the caller, so the polls/poll_options RLS policies (member-only, date/place
+-- organizer-only) still apply in full.
+create or replace function public.create_poll_with_options(
+  p_event uuid, p_question text, p_kind public.poll_kind,
+  p_mode public.poll_mode, p_labels text[])
+returns uuid
+language plpgsql security invoker set search_path = public, pg_temp
+as $$
+declare
+  v_poll uuid;
+  v_label text;
+  v_pos int := 0;
+begin
+  if p_labels is null or array_length(p_labels, 1) < 2 then
+    raise exception 'a poll needs at least two options' using errcode = 'check_violation';
+  end if;
+  insert into public.polls (event_id, question, kind, mode, created_by)
+  values (p_event, btrim(p_question), p_kind, p_mode, auth.uid())
+  returning id into v_poll;
+  foreach v_label in array p_labels loop
+    if btrim(v_label) <> '' then
+      v_pos := v_pos + 1;
+      insert into public.poll_options (poll_id, event_id, label, position)
+      values (v_poll, p_event, btrim(v_label), v_pos);
+    end if;
+  end loop;
+  if v_pos < 2 then
+    raise exception 'a poll needs at least two non-empty options' using errcode = 'check_violation';
+  end if;
+  return v_poll;
+end;
+$$;
+revoke all on function public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[]) from public;
+grant execute on function public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[]) to authenticated;
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- GUARD — date/place polls may only be created by an organizer. (general polls:
 -- any member.) Enforced in a trigger so the INSERT policy stays simple.
@@ -387,6 +445,29 @@ create policy poll_votes_select on public.poll_votes
     public.is_event_member(event_id)
     and (user_id = auth.uid() or public.is_poll_closed(poll_id))
   );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Event history hook — log a poll's creation on the event's change log.
+-- Lives HERE (not schema.sql) because public.polls doesn't exist when
+-- schema.sql is applied to a fresh database. log_event_history() is defined in
+-- schema.sql; close/reopen logging is inside the RPCs above.
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.log_poll_created()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  perform public.log_event_history(
+    new.event_id, auth.uid(), 'poll_created', null, new.question,
+    jsonb_build_object('poll_id', new.id, 'question', new.question));
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_log_poll_created on public.polls;
+create trigger trg_log_poll_created
+  after insert on public.polls
+  for each row execute function public.log_poll_created();
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Realtime

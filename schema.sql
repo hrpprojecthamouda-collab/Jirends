@@ -418,6 +418,38 @@ create trigger trg_enforce_comment_two_levels
   before insert or update of parent_id, thread_title on public.comments
   for each row execute function public.enforce_comment_two_levels();
 
+-- Column guard for comment updates. The comments_update RLS policy is
+-- member-scoped so any member can collaboratively name a discussion
+-- (thread_title) — but RLS alone would let a member rewrite anyone's body,
+-- re-attribute a comment (author_id), or move it between events (event_id).
+-- This trigger freezes everything except thread_title (any member) and body
+-- (author only). Freezing parent_id also closes the re-parent/self-parent
+-- loophole on UPDATE.
+create or replace function public.guard_comment_update()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if new.event_id   is distinct from old.event_id
+  or new.author_id  is distinct from old.author_id
+  or new.parent_id  is distinct from old.parent_id
+  or new.created_at is distinct from old.created_at then
+    raise exception 'comment identity columns are immutable'
+      using errcode = 'check_violation';
+  end if;
+  if new.body is distinct from old.body and auth.uid() <> old.author_id then
+    raise exception 'only the author may edit a comment''s body'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_comment_update on public.comments;
+create trigger trg_guard_comment_update
+  before update on public.comments
+  for each row execute function public.guard_comment_update();
+
 -- Reply counts per root comment for an event (member-scoped, so the comment
 -- list shows "N replies" without reading every reply row).
 create or replace function public.comment_reply_counts(p_event uuid)
@@ -441,8 +473,11 @@ grant execute on function public.comment_reply_counts(uuid) to authenticated;
 -- ════════════════════════════════════════════════════════════════════════════
 -- EVENT HISTORY — append-only change log. log_event_history() is the single
 -- writer (SECURITY DEFINER, bypasses the write-less RLS). A trigger on events
--- logs watched-field edits; a trigger on polls logs creation; the close/reopen
--- poll RPCs (polls.sql) log poll_closed(+result)/poll_reopened.
+-- (below) logs watched-field edits. The pieces that depend on LATER files live
+-- with their dependencies so this file still bootstraps a fresh database:
+--   status_label()            -> event_types.sql (needs event_type_phases)
+--   trg_log_poll_created      -> polls.sql       (needs public.polls)
+--   poll_closed/poll_reopened -> polls.sql RPCs
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.log_event_history(
   p_event uuid, p_actor uuid, p_kind text,
@@ -454,18 +489,6 @@ begin
   insert into public.event_history (event_id, actor_id, kind, old_value, new_value, detail)
   values (p_event, p_actor, p_kind, p_old, p_new, coalesce(p_detail, '{}'::jsonb));
 end;
-$$;
-
--- Human label for a status key within the event's type (events.event_type is
--- the event_type ENUM). Falls back to the raw key.
-create or replace function public.status_label(p_event_type public.event_type, p_key text)
-returns text
-language sql stable security definer set search_path = public, pg_temp
-as $$
-  select coalesce(
-    (select label from public.event_type_phases
-       where event_type = p_event_type and key = p_key),
-    p_key);
 $$;
 
 -- One history row per watched field that actually changed (updated_at-only or
@@ -508,23 +531,6 @@ drop trigger if exists trg_log_event_changes on public.events;
 create trigger trg_log_event_changes
   after update on public.events
   for each row execute function public.log_event_changes();
-
-create or replace function public.log_poll_created()
-returns trigger
-language plpgsql security definer set search_path = public, pg_temp
-as $$
-begin
-  perform public.log_event_history(
-    new.event_id, auth.uid(), 'poll_created', null, new.question,
-    jsonb_build_object('poll_id', new.id, 'question', new.question));
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_log_poll_created on public.polls;
-create trigger trg_log_poll_created
-  after insert on public.polls
-  for each row execute function public.log_poll_created();
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- updated_at maintenance
@@ -788,5 +794,6 @@ begin
     begin alter publication supabase_realtime add table public.comments;      exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.reactions;     exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.attachments;   exception when duplicate_object then null; end;
+    begin alter publication supabase_realtime add table public.event_history; exception when duplicate_object then null; end;
   end if;
 end$$;

@@ -1,4 +1,6 @@
--- event_types.sql — per-type phases & fields as DATA (apply THIRD, last).
+-- event_types.sql — per-type phases & fields as DATA.
+-- Apply order: schema.sql -> social_layer.sql -> event_types.sql (this file)
+-- -> crews.sql -> polls.sql.
 --
 -- Event types are DEVELOPER-defined (the event_type enum). Their workflows
 -- (phases) and type-specific fields live in seed tables here — NOT in Dart and
@@ -49,6 +51,23 @@ create table if not exists public.event_type_phases (
   primary key (event_type, key),
   unique (event_type, position)
 );
+
+-- Human label for a status key within an event's type; falls back to the raw
+-- key. Used by the event-history trigger (schema.sql) — it lives HERE because
+-- it needs event_type_phases + the enum, which don't exist when schema.sql is
+-- applied to a fresh database. Signature takes text (callers may pass the enum;
+-- Postgres resolves it) and matches the deployed `event_history` migration —
+-- do NOT change it to the enum type or a re-apply would create a second
+-- ambiguous overload.
+create or replace function public.status_label(p_event_type text, p_key text)
+returns text
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select coalesce(
+    (select label from public.event_type_phases
+       where event_type = p_event_type::public.event_type and key = p_key),
+    p_key);
+$$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- event_type_fields — type-specific property definitions. Values live in

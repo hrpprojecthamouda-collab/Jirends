@@ -346,6 +346,31 @@ begin
     if (select thread_title from public.comments where id=droot) <> 'Dinner venue' then
       raise exception '❌ ASSERTION FAILED: any member should be able to name the discussion'; end if;
 
+    -- Column guard: thread_title is the ONLY member-editable column. Carol
+    -- (a member, not the author) must not be able to rewrite Bob''s body,
+    -- re-attribute the comment, move it to another event, or re-parent it.
+    ok := false;
+    begin update public.comments set body='forged' where id=droot;
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: a non-author must not edit a comment body'; end if;
+    ok := false;
+    begin update public.comments set author_id=carol where id=droot;
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: author_id must be immutable'; end if;
+    ok := false;
+    begin update public.comments set event_id=ev_trip where id=droot;
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: a comment must not be movable between events'; end if;
+    ok := false;
+    begin update public.comments set parent_id=drep where id=droot;
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ ASSERTION FAILED: parent_id must be immutable (no re-parenting)'; end if;
+    -- The author may still edit their own body.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    update public.comments set body='Where to eat? (edited)' where id=droot;
+    if (select body from public.comments where id=droot) <> 'Where to eat? (edited)' then
+      raise exception '❌ ASSERTION FAILED: the author should be able to edit their own body'; end if;
+
     -- CARDINAL: the surprise target (Dave) sees no discussion comments or counts.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into n from public.comments where event_id=ev;
@@ -365,10 +390,26 @@ begin
     select count(*) into hn from public.event_history where event_id=ev and kind in ('title','location');
     if hn <> 2 then raise exception '❌ TEST13: a 2-field edit should log 2 rows (got %)', hn; end if;
     select old_value, new_value into hold, hnew from public.event_history where event_id=ev and kind='location';
-    if hold is not null then null; end if; -- location had no prior value (ev was created without one)
+    if hold is not null then
+      raise exception '❌ TEST13: location old_value should be null (ev was created without one), got %', hold; end if;
     if hnew <> 'Secret venue' then raise exception '❌ TEST13: location new_value wrong'; end if;
     if (select actor_id from public.event_history where event_id=ev and kind='title') <> alice then
       raise exception '❌ TEST13: actor should be Alice'; end if;
+
+    -- A status change logs phase LABELS (status_label resolves with the enum
+    -- column — this guards the function's signature staying call-compatible).
+    declare hkey text; hlabel text;
+    begin
+      select p.key, p.label into hkey, hlabel
+        from public.event_type_phases p
+        join public.events e on e.id = ev and p.event_type = e.event_type
+        where p.key is distinct from e.status
+        order by p.position limit 1;
+      update public.events set status=hkey where id=ev;
+      select new_value into hnew from public.event_history where event_id=ev and kind='status';
+      if hnew is distinct from hlabel then
+        raise exception '❌ TEST13: status change should log the phase label % (got %)', hlabel, hnew; end if;
+    end;
 
     -- Members read history; the surprise target (Dave) reads NONE.
     perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
