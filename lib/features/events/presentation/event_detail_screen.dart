@@ -110,7 +110,10 @@ class _DetailScaffold extends ConsumerWidget {
     await notifier.save(eventId, title: newTitle);
   }
 
-  static const int _filesTabIndex = 4;
+  // Index of the Files tab in the TabBar/TabBarView below. Tab order:
+  // 0 Overview, 1 Members, 2 Items, 3 Polls, 4 Comments, 5 Files, 6 History —
+  // keep this in sync when tabs are added or reordered.
+  static const int _filesTabIndex = 5;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

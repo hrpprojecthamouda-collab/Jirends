@@ -177,6 +177,7 @@
   "pollClose": "Close poll",
   "pollReopen": "Reopen",
   "pollDelete": "Delete poll",
+  "pollDeleteConfirm": "Delete this poll and its votes?",
   "pollWinner": "Winner: {label}",
   "@pollWinner": { "placeholders": { "label": { "type": "String" } } },
   "pollTie": "Tie — no winner. Reopen to decide.",

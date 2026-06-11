@@ -9,12 +9,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/util/short_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/comment_controller.dart';
 import '../data/comment.dart';
 import '../data/reaction.dart';
 import 'widgets/reaction_bar.dart';
+import 'widgets/thread_title_dialog.dart';
 
 class DiscussionScreen extends ConsumerStatefulWidget {
   const DiscussionScreen({
@@ -52,20 +54,15 @@ class _DiscussionScreenState extends ConsumerState<DiscussionScreen> {
   }
 
   Future<void> _rename(Comment root) async {
-    final t = AppLocalizations.of(context);
     final notifier = ref.read(commentActionsControllerProvider.notifier);
     final title = await showDialog<String>(
       context: context,
-      builder: (_) => _RenameDialog(initial: root.threadTitle ?? ''),
+      builder: (_) => ThreadTitleDialog(initial: root.threadTitle ?? ''),
     );
     if (title == null) return;
     await notifier.setThreadTitle(widget.rootId, title.isEmpty ? null : title);
     // Refresh the header if we're showing the passed-in copy.
     ref.invalidate(commentByIdProvider(widget.rootId));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(t.discussionRename)));
   }
 
   @override
@@ -236,16 +233,14 @@ class _MessageCard extends ConsumerWidget {
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: accent, fontWeight: FontWeight.w700)),
                 ),
-                Text(_time(comment.createdAt.toLocal()),
+                Text(formatShortTime(comment.createdAt.toLocal()),
                     style: Theme.of(context)
                         .textTheme
                         .labelSmall
                         ?.copyWith(color: AppColors.inkMuted)),
                 if (isMine)
                   InkWell(
-                    onTap: () => ref
-                        .read(commentActionsControllerProvider.notifier)
-                        .delete(comment.id),
+                    onTap: () => _confirmDelete(context, ref),
                     child: const Padding(
                       padding: EdgeInsets.only(left: 8),
                       child:
@@ -270,52 +265,29 @@ class _MessageCard extends ConsumerWidget {
     );
   }
 
-  String _time(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} '
-      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-}
-
-class _RenameDialog extends StatefulWidget {
-  const _RenameDialog({required this.initial});
-  final String initial;
-
-  @override
-  State<_RenameDialog> createState() => _RenameDialogState();
-}
-
-class _RenameDialogState extends State<_RenameDialog> {
-  late final TextEditingController _c =
-      TextEditingController(text: widget.initial);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  /// Confirm, then delete. Deleting the ROOT cascades its replies and closes
+  /// the discussion screen (otherwise the user is stranded on a dead thread).
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(t.discussionRename),
-      content: TextField(
-        controller: _c,
-        autofocus: true,
-        maxLength: 120,
-        decoration:
-            InputDecoration(labelText: t.discussionTitleLabel, counterText: ''),
-        onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+    final notifier = ref.read(commentActionsControllerProvider.notifier);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Text(t.commentDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(t.commentDelete),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(t.commonCancel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_c.text.trim()),
-          child: Text(t.commonAdd),
-        ),
-      ],
     );
+    if (confirmed != true) return;
+    final ok = await notifier.delete(comment.id);
+    if (ok && isRoot && context.mounted) Navigator.of(context).pop();
   }
 }

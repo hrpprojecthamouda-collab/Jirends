@@ -61,12 +61,21 @@ class PollsTab extends ConsumerWidget {
                       style: const TextStyle(color: AppColors.inkMuted)),
                 ),
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                children: [
-                  for (final v in polls)
-                    PollCard(view: v, isEventOrganizer: isOrganizer),
-                ],
+            // Pull-to-refresh: the poll list is a one-shot fetch invalidated by
+            // the local user's own actions, so this is how you pick up OTHER
+            // members' votes/closes without leaving the tab. (An earlier commit
+            // removed this chasing a layout crash whose real cause turned out
+            // to be the Material buttons in the poll card, since replaced.)
+            : RefreshIndicator(
+                onRefresh: () async =>
+                    ref.invalidate(eventPollsProvider(eventId)),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                  children: [
+                    for (final v in polls)
+                      PollCard(view: v, isEventOrganizer: isOrganizer),
+                  ],
+                ),
               ),
       ),
     );

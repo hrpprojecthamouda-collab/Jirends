@@ -17,15 +17,19 @@ final eventCommentsProvider =
   return ref.watch(commentRepositoryProvider).watchComments(eventId);
 });
 
-/// Live replies inside one discussion (root comment id).
+/// Live replies inside one discussion (root comment id). autoDispose: keyed
+/// per root comment, so without it every discussion ever opened would hold a
+/// realtime channel for the rest of the session.
 final repliesProvider =
-    StreamProvider.family<List<Comment>, String>((ref, rootId) {
+    StreamProvider.autoDispose.family<List<Comment>, String>((ref, rootId) {
   return ref.watch(commentRepositoryProvider).watchReplies(rootId);
 });
 
 /// The discussion's root comment by id (for the discussion screen header).
+/// autoDispose so reopening a discussion re-fetches (picks up another member's
+/// rename instead of serving a session-cached copy).
 final commentByIdProvider =
-    FutureProvider.family<Comment?, String>((ref, id) {
+    FutureProvider.autoDispose.family<Comment?, String>((ref, id) {
   return ref.watch(commentRepositoryProvider).fetchComment(id);
 });
 
@@ -65,9 +69,10 @@ class CommentActionsController extends AsyncNotifier<void> {
     return !state.hasError;
   }
 
-  Future<void> delete(String commentId) async {
+  Future<bool> delete(String commentId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _comments.deleteComment(commentId));
+    return !state.hasError;
   }
 
   Future<void> toggleReaction(

@@ -70,14 +70,20 @@ class PollRepository {
           r['poll_id'] as String: r['option_id'] as String,
       };
 
+      // All tallies for the event in one round-trip (member-gated RPC).
+      final tallyRows = await _client
+          .rpc('poll_tallies_for_event', params: {'p_event': eventId});
+      final talliesByPoll = <String, Map<String, int>>{};
+      for (final r in (tallyRows as List)) {
+        final row = r as Map;
+        (talliesByPoll[row['poll_id'] as String] ??= {})[
+            row['option_id'] as String] = (row['votes'] as num).toInt();
+      }
+
       final views = <PollView>[];
       for (final poll in polls) {
         final opts = options.where((o) => o.pollId == poll.id).toList();
-        final tallyRows = await _client.rpc('poll_tallies', params: {'p_poll': poll.id});
-        final tallies = <String, int>{
-          for (final r in (tallyRows as List))
-            (r as Map)['option_id'] as String: (r['votes'] as num).toInt(),
-        };
+        final tallies = talliesByPoll[poll.id] ?? const <String, int>{};
         // After close, fetch the full who-voted-what breakdown (RLS allows it).
         List<PollVote> closedVotes = const [];
         if (poll.isClosed) {
@@ -112,26 +118,19 @@ class PollRepository {
     final uid = _uid;
     if (uid == null) throw const AuthFailure('You are not signed in.');
     try {
-      final pollRow = await _client
-          .from('polls')
-          .insert({
-            'event_id': eventId,
-            'question': question.trim(),
-            'kind': kind.name,
-            'mode': mode == PollMode.weightedRandom ? 'weighted_random' : 'majority',
-            'created_by': uid,
-          })
-          .select()
-          .single();
-      final pollId = pollRow['id'] as String;
-      final cleaned = labels
-          .map((l) => l.trim())
-          .where((l) => l.isNotEmpty)
-          .toList();
-      await _client.from('poll_options').insert([
-        for (var i = 0; i < cleaned.length; i++)
-          {'poll_id': pollId, 'event_id': eventId, 'label': cleaned[i], 'position': i + 1},
-      ]);
+      // Atomic RPC (SECURITY INVOKER, so RLS still applies): poll + options in
+      // one call — a failure can't leave an option-less poll behind.
+      await _client.rpc('create_poll_with_options', params: {
+        'p_event': eventId,
+        'p_question': question.trim(),
+        'p_kind': kind.name,
+        'p_mode':
+            mode == PollMode.weightedRandom ? 'weighted_random' : 'majority',
+        'p_labels': [
+          for (final l in labels)
+            if (l.trim().isNotEmpty) l.trim(),
+        ],
+      });
     } catch (e) {
       throw mapToFailure(e);
     }

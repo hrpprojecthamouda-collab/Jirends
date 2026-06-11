@@ -157,6 +157,7 @@
   "pollClose": "Clore le sondage",
   "pollReopen": "Rouvrir",
   "pollDelete": "Supprimer le sondage",
+  "pollDeleteConfirm": "Supprimer ce sondage et ses votes ?",
   "pollWinner": "Gagnant : {label}",
   "pollTie": "Égalité — aucun gagnant. Rouvrez pour décider.",
   "pollNoVotes": "Clos sans aucun vote.",

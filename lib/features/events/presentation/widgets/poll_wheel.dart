@@ -60,7 +60,11 @@ class _PollWheelState extends State<PollWheel>
       }
       final winnerMidFraction =
           startFraction + (widget.weights[winner] / total) / 2;
-      target = 4 + (0.75 - winnerMidFraction);
+      // Slices are painted from the TOP, sweeping clockwise; a positive
+      // rotation is also clockwise. The winner's mid sits winnerMidFraction
+      // turns past the pointer, so spin (1 - winnerMidFraction) extra turns
+      // (plus full turns for show) to bring it back under the pointer.
+      target = 4 + (1 - winnerMidFraction);
     }
     _turns = Tween<double>(begin: 0, end: target).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),

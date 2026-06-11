@@ -138,7 +138,7 @@ class PollCard extends ConsumerWidget {
                     color: AppColors.coral,
                     filled: false,
                     iconOnly: true,
-                    onTap: () => actions.delete(poll.id, poll.eventId),
+                    onTap: () => _confirmDelete(context, t, actions),
                   ),
                 ],
               ),
@@ -147,6 +147,30 @@ class PollCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Confirm before deleting — organizers can delete OTHER people's polls, so
+  /// a stray tap must not silently destroy someone's poll and its votes.
+  Future<void> _confirmDelete(BuildContext context, AppLocalizations t,
+      PollActionsController actions) async {
+    final poll = view.poll;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Text(t.pollDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(t.pollDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await actions.delete(poll.id, poll.eventId);
   }
 
   Widget _outcome(BuildContext context, AppLocalizations t) {

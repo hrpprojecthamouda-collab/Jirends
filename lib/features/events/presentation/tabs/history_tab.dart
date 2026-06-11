@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/util/short_time.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../auth/application/auth_controller.dart';
 import '../../application/event_history_controller.dart';
@@ -88,7 +89,7 @@ class _HistoryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(_time(entry.createdAt.toLocal()),
+            Text(formatShortTime(entry.createdAt.toLocal()),
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
@@ -168,12 +169,8 @@ class _HistoryTile extends StatelessWidget {
     if (raw == null || raw.isEmpty) return null;
     if (k == HistoryKind.startsAt || k == HistoryKind.endsAt) {
       final dt = DateTime.tryParse(raw);
-      if (dt != null) return _time(dt.toLocal());
+      if (dt != null) return formatShortTime(dt.toLocal());
     }
     return raw;
   }
-
-  String _time(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} '
-      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }

@@ -158,6 +158,7 @@
   "pollClose": "Sakkar el-sondage",
   "pollReopen": "7el mn jdid",
   "pollDelete": "Na77i el-sondage",
+  "pollDeleteConfirm": "Na77i el-sondage hetha w el-votes mte3ou?",
   "pollWinner": "El-rabe7 : {label}",
   "pollTie": "Ta3adol — famma 7atta rabe7. 7el mn jdid bech tqarrou.",
   "pollNoVotes": "Tsakkar bla votes.",
