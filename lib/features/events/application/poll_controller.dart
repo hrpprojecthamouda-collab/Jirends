@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/poll.dart';
 import '../data/poll_repository.dart';
+import 'event_list_controller.dart';
 
 /// One-shot fetch of an event's composed poll views. A FutureProvider (not a
 /// realtime stream): the polls list is built from several queries + RPCs, and a
@@ -32,6 +33,7 @@ class PollActionsController extends AsyncNotifier<void> {
     required PollKind kind,
     required PollMode mode,
     required List<String> labels,
+    List<String?>? values,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.createPoll(
@@ -40,6 +42,7 @@ class PollActionsController extends AsyncNotifier<void> {
           kind: kind,
           mode: mode,
           labels: labels,
+          values: values,
         ));
     if (!state.hasError) _refresh(eventId);
     return !state.hasError;
@@ -54,7 +57,12 @@ class PollActionsController extends AsyncNotifier<void> {
   Future<void> close(String pollId, String eventId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.closePoll(pollId));
-    if (!state.hasError) _refresh(eventId);
+    if (!state.hasError) {
+      _refresh(eventId);
+      // Closing a place/day/time poll applies the winner to the event server-
+      // side — refresh it so the ticket header/Overview show the result.
+      ref.invalidate(eventByIdProvider(eventId));
+    }
   }
 
   Future<void> reopen(String pollId, String eventId) async {

@@ -43,8 +43,9 @@ class PollCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: question + chips.
-            Text(poll.question,
+            // Header: question + chips. Special kinds (day/time/place) render
+            // the viewer-localized auto-title, not the stored question.
+            Text(_title(t, poll),
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
@@ -61,6 +62,15 @@ class PollCard extends ConsumerWidget {
               _chip(context, poll.isOpen ? t.pollOpen : t.pollClosed,
                   poll.isOpen ? AppColors.teal : AppColors.inkMuted),
             ]),
+            // Special kinds: the winner is written onto the event at close.
+            if (poll.kind != PollKind.general) ...[
+              const SizedBox(height: 6),
+              Text(t.pollAppliedToEvent,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: AppColors.inkMuted)),
+            ],
             const SizedBox(height: 12),
 
             // Options with tally bars.
@@ -209,7 +219,17 @@ class PollCard extends ConsumerWidget {
   String _kindLabel(AppLocalizations t, PollKind k) => switch (k) {
         PollKind.general => t.pollKindGeneral,
         PollKind.date => t.pollKindDate,
+        PollKind.time => t.pollKindTime,
         PollKind.place => t.pollKindPlace,
+      };
+
+  /// Special kinds show a fixed, viewer-localized title; general polls show
+  /// their stored question.
+  String _title(AppLocalizations t, Poll poll) => switch (poll.kind) {
+        PollKind.general => poll.question,
+        PollKind.date => t.pollTitleDay,
+        PollKind.time => t.pollTitleTime,
+        PollKind.place => t.pollTitlePlace,
       };
 
   Widget _chip(BuildContext context, String text, Color color) => Container(

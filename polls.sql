@@ -33,6 +33,10 @@ begin
   end if;
 end$$;
 
+-- 'date' means DAY; 'time' decides the hours. Added later (poll_apply_winners
+-- migration), hence the separate ALTER.
+alter type public.poll_kind add value if not exists 'time';
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- Tables
 -- ────────────────────────────────────────────────────────────────────────────
@@ -57,9 +61,14 @@ create table if not exists public.poll_options (
   poll_id    uuid not null references public.polls(id) on delete cascade,
   event_id   uuid not null references public.events(id) on delete cascade, -- for RLS
   label      text not null check (char_length(label) between 1 and 120),
+  -- Typed payload so a winner can be APPLIED to the event on close:
+  -- day ('date' kind) -> 'YYYY-MM-DD', 'time' -> 'HH24:MI',
+  -- general/place -> null (a place option's label IS its value).
+  value      text,
   position   integer not null default 0,
   created_at timestamptz not null default now()
 );
+alter table public.poll_options add column if not exists value text;
 create index if not exists poll_options_poll_idx on public.poll_options (poll_id);
 
 -- Now wire the winner FK on polls (set null if the option is removed).
@@ -147,29 +156,57 @@ grant execute on function public.poll_tallies_for_event(uuid) to authenticated;
 -- Atomic poll creation: poll + options in one call so a failure can't leave an
 -- option-less poll behind. SECURITY INVOKER on purpose — the inserts run as
 -- the caller, so the polls/poll_options RLS policies (member-only, date/place
--- organizer-only) still apply in full.
+-- organizer-only) still apply in full. p_values pairs 1:1 with p_labels and is
+-- REQUIRED + validated for day ('date') and 'time' kinds.
+drop function if exists public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[]);
 create or replace function public.create_poll_with_options(
   p_event uuid, p_question text, p_kind public.poll_kind,
-  p_mode public.poll_mode, p_labels text[])
+  p_mode public.poll_mode, p_labels text[], p_values text[] default null)
 returns uuid
 language plpgsql security invoker set search_path = public, pg_temp
 as $$
 declare
   v_poll uuid;
-  v_label text;
   v_pos int := 0;
+  v_label text;
+  v_value text;
+  i int;
 begin
   if p_labels is null or array_length(p_labels, 1) < 2 then
     raise exception 'a poll needs at least two options' using errcode = 'check_violation';
   end if;
+  if p_values is not null
+     and array_length(p_values, 1) is distinct from array_length(p_labels, 1) then
+    raise exception 'p_values must pair 1:1 with p_labels' using errcode = 'check_violation';
+  end if;
   insert into public.polls (event_id, question, kind, mode, created_by)
   values (p_event, btrim(p_question), p_kind, p_mode, auth.uid())
   returning id into v_poll;
-  foreach v_label in array p_labels loop
-    if btrim(v_label) <> '' then
+  for i in 1 .. array_length(p_labels, 1) loop
+    v_label := btrim(coalesce(p_labels[i], ''));
+    v_value := case when p_values is null then null
+                    else nullif(btrim(coalesce(p_values[i], '')), '') end;
+    if v_label <> '' then
       v_pos := v_pos + 1;
-      insert into public.poll_options (poll_id, event_id, label, position)
-      values (v_poll, p_event, btrim(v_label), v_pos);
+      if p_kind = 'date' then
+        if v_value is null then
+          raise exception 'a day option needs a date value' using errcode = 'check_violation';
+        end if;
+        begin perform v_value::date;
+        exception when others then
+          raise exception 'invalid date value "%"', v_value using errcode = 'check_violation';
+        end;
+      elsif p_kind = 'time' then
+        if v_value is null then
+          raise exception 'a time option needs a time value' using errcode = 'check_violation';
+        end if;
+        begin perform v_value::time;
+        exception when others then
+          raise exception 'invalid time value "%"', v_value using errcode = 'check_violation';
+        end;
+      end if;
+      insert into public.poll_options (poll_id, event_id, label, position, value)
+      values (v_poll, p_event, v_label, v_pos, v_value);
     end if;
   end loop;
   if v_pos < 2 then
@@ -178,8 +215,8 @@ begin
   return v_poll;
 end;
 $$;
-revoke all on function public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[]) from public;
-grant execute on function public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[]) to authenticated;
+revoke all on function public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[], text[]) from public;
+grant execute on function public.create_poll_with_options(uuid, text, public.poll_kind, public.poll_mode, text[], text[]) to authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- GUARD — date/place polls may only be created by an organizer. (general polls:
@@ -190,7 +227,9 @@ returns trigger
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
-  if new.kind in ('date','place') and not public.is_event_organizer(new.event_id) then
+  -- 'time' included: these kinds APPLY their winner to the event on close, so
+  -- creation (and hence the creator-only close) must stay organizer-gated.
+  if new.kind in ('date','time','place') and not public.is_event_organizer(new.event_id) then
     raise exception 'only an organizer can create a % poll for event %', new.kind, new.event_id
       using errcode = 'insufficient_privilege';
   end if;
@@ -320,10 +359,16 @@ begin
   where id = p_poll
   returning * into v_poll;
 
-  -- Record the close (+ outcome) in the event history.
+  -- Apply the winner to the event (special kinds, both modes) + record the
+  -- close in the history. Tie / no-votes apply nothing. The events UPDATE
+  -- fires trg_log_event_changes, so the applied change lands in the History
+  -- tab with the closer as actor. SECURITY DEFINER is safe: the closer is the
+  -- poll's creator, and date/time/place polls are organizer-only at creation
+  -- (trg_reject_nonorganizer_typed_poll).
   declare
     v_outcome text;
     v_label   text := null;
+    v_value   text := null;
   begin
     if v_total = 0 then
       v_outcome := 'no_votes';
@@ -331,7 +376,25 @@ begin
       v_outcome := 'tie';
     else
       v_outcome := 'winner';
-      select label into v_label from public.poll_options where id = v_winner;
+      select label, value into v_label, v_value
+        from public.poll_options where id = v_winner;
+
+      if v_poll.kind = 'place' then
+        update public.events set location = v_label where id = v_poll.event_id;
+      elsif v_poll.kind = 'date' and v_value is not null then
+        -- Replace the DATE part of starts_at, preserve time-of-day (UTC).
+        update public.events
+          set starts_at = ((v_value::date)::timestamp
+                + coalesce((starts_at at time zone 'utc')::time, time '00:00'))
+                at time zone 'utc'
+          where id = v_poll.event_id;
+      elsif v_poll.kind = 'time' and v_value is not null then
+        -- Replace the TIME part — only when a start date already exists.
+        update public.events
+          set starts_at = (((starts_at at time zone 'utc')::date)::timestamp
+                + v_value::time) at time zone 'utc'
+          where id = v_poll.event_id and starts_at is not null;
+      end if;
     end if;
     perform public.log_event_history(
       v_poll.event_id, auth.uid(), 'poll_closed', null, v_label,

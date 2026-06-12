@@ -427,6 +427,69 @@ begin
     if not hok then raise exception '❌ TEST13: clients must not write event_history directly'; end if;
   end;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 14 — SPECIAL POLLS APPLY THEIR WINNER. place -> events.location;
+  -- day ('date') -> the date part of starts_at (time-of-day preserved);
+  -- 'time' -> the time part, ONLY when a start date exists. Organizer-gated
+  -- creation includes the new 'time' kind. (Uses surprise event `ev`,
+  -- organizer Alice, member Bob; plus ev_dinner for the no-date skip case.)
+  -- ════════════════════════════════════════════════════════════════════════
+  declare
+    pp uuid; po2 uuid; tloc text; tstart timestamptz;
+  begin
+    -- A member (Bob) must NOT be able to create a 'time' poll (guard covers it).
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    ok := false;
+    begin pp := public.create_poll_with_options(ev,'Time vote','time','majority',array['19:00','20:00'],array['19:00','20:00']);
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ TEST14: a non-organizer must not create a time poll'; end if;
+
+    -- PLACE: winner becomes events.location; history logs it with the closer.
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    pp := public.create_poll_with_options(ev,'Place vote','place','majority',array['Chez Ali','Le Jardin']);
+    select id into po2 from public.poll_options where poll_id=pp and position=2;
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pp,ev,po2,alice);
+    perform public.close_poll(pp);
+    select location into tloc from public.events where id=ev;
+    if tloc is distinct from 'Le Jardin' then
+      raise exception '❌ TEST14: place winner should set events.location (got %)', tloc; end if;
+    if not exists (select 1 from public.event_history where event_id=ev and kind='location' and new_value='Le Jardin' and actor_id=alice) then
+      raise exception '❌ TEST14: applied place must be logged in history with the closer as actor'; end if;
+
+    -- DAY: replaces the date part of starts_at, preserves the time-of-day.
+    update public.events set starts_at='2026-07-01T18:00:00Z' where id=ev;
+    pp := public.create_poll_with_options(ev,'Day vote','date','majority',array['10/07','11/07'],array['2026-07-10','2026-07-11']);
+    select id into po2 from public.poll_options where poll_id=pp and position=1;
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pp,ev,po2,alice);
+    perform public.close_poll(pp);
+    select starts_at into tstart from public.events where id=ev;
+    if tstart is distinct from '2026-07-10T18:00:00Z'::timestamptz then
+      raise exception '❌ TEST14: day winner should replace the date and keep 18:00Z (got %)', tstart; end if;
+
+    -- TIME with a date present: replaces the time-of-day, keeps the date.
+    pp := public.create_poll_with_options(ev,'Time vote','time','majority',array['21:15','22:00'],array['21:15','22:00']);
+    select id into po2 from public.poll_options where poll_id=pp and position=1;
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pp,ev,po2,alice);
+    perform public.close_poll(pp);
+    select starts_at into tstart from public.events where id=ev;
+    if tstart is distinct from '2026-07-10T21:15:00Z'::timestamptz then
+      raise exception '❌ TEST14: time winner should set 21:15Z on the same day (got %)', tstart; end if;
+
+    -- TIME without a date (ev_dinner has no starts_at): closes, applies NOTHING.
+    pp := public.create_poll_with_options(ev_dinner,'Time vote','time','majority',array['19:00','20:30'],array['19:00','20:30']);
+    select id into po2 from public.poll_options where poll_id=pp and position=1;
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pp,ev_dinner,po2,alice);
+    perform public.close_poll(pp);
+    if (select starts_at from public.events where id=ev_dinner) is not null then
+      raise exception '❌ TEST14: a time winner must NOT invent a start date'; end if;
+
+    -- Bad typed value rejected at creation.
+    ok := false;
+    begin pp := public.create_poll_with_options(ev,'Day vote','date','majority',array['x','y'],array['nope','2026-07-12']);
+    exception when others then ok := true; end;
+    if not ok then raise exception '❌ TEST14: an unparseable date value must be rejected'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);

@@ -108,28 +108,37 @@ class PollRepository {
     }
   }
 
+  /// [values] pairs 1:1 with [labels] and is required for day/time kinds
+  /// (day: 'YYYY-MM-DD', time: 'HH:mm') — it's what gets applied to the event
+  /// when the poll closes. Pass null for general/place.
   Future<void> createPoll(
     String eventId, {
     required String question,
     required PollKind kind,
     required PollMode mode,
     required List<String> labels,
+    List<String?>? values,
   }) async {
     final uid = _uid;
     if (uid == null) throw const AuthFailure('You are not signed in.');
+    assert(values == null || values.length == labels.length,
+        'values must pair 1:1 with labels');
     try {
       // Atomic RPC (SECURITY INVOKER, so RLS still applies): poll + options in
-      // one call — a failure can't leave an option-less poll behind.
+      // one call — a failure can't leave an option-less poll behind. Keep the
+      // label/value pairing intact: only drop entries whose label is empty.
+      final keep = [
+        for (var i = 0; i < labels.length; i++)
+          if (labels[i].trim().isNotEmpty) i,
+      ];
       await _client.rpc('create_poll_with_options', params: {
         'p_event': eventId,
         'p_question': question.trim(),
         'p_kind': kind.name,
         'p_mode':
             mode == PollMode.weightedRandom ? 'weighted_random' : 'majority',
-        'p_labels': [
-          for (final l in labels)
-            if (l.trim().isNotEmpty) l.trim(),
-        ],
+        'p_labels': [for (final i in keep) labels[i].trim()],
+        if (values != null) 'p_values': [for (final i in keep) values[i]],
       });
     } catch (e) {
       throw mapToFailure(e);

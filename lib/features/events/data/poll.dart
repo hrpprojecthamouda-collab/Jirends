@@ -10,7 +10,9 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'poll.freezed.dart';
 part 'poll.g.dart';
 
-enum PollKind { general, date, place }
+/// `date` decides the DAY; `time` decides the hours. Both names match the PG
+/// enum literals, so `kind.name` round-trips.
+enum PollKind { general, date, place, time }
 
 enum PollMode {
   majority,
