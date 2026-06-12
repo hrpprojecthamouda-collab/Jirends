@@ -24,7 +24,7 @@ class ProfileAvatarButton extends ConsumerWidget {
         customBorder: const CircleBorder(),
         child: CircleAvatar(
           radius: 16,
-          backgroundColor: AppColors.violet,
+          backgroundColor: AppColors.primary,
           foregroundColor: AppColors.onAccent,
           child: Text(
             initials,

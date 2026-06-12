@@ -66,7 +66,7 @@ class _Chip extends StatelessWidget {
           color: mine ? AppColors.surfaceHi : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: mine ? AppColors.violet : AppColors.outline),
+              color: mine ? AppColors.primary : AppColors.outline),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

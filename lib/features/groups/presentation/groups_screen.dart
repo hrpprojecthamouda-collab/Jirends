@@ -106,7 +106,7 @@ class GroupsScreen extends ConsumerWidget {
                           child: ListTile(
                             leading: const CircleAvatar(
                               backgroundColor: AppColors.surfaceHi,
-                              foregroundColor: AppColors.violet,
+                              foregroundColor: AppColors.primary,
                               child: Icon(Icons.groups_2_outlined),
                             ),
                             title: Text(c.name),

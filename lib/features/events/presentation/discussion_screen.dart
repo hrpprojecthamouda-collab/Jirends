@@ -113,7 +113,7 @@ class _DiscussionScreenState extends ConsumerState<DiscussionScreen> {
               child: _MessageCard(
                 comment: root,
                 myId: myId,
-                accent: AppColors.violet,
+                accent: AppColors.primary,
                 reactions:
                     reactions.where((r) => r.commentId == root.id).toList(),
                 eventId: widget.eventId,

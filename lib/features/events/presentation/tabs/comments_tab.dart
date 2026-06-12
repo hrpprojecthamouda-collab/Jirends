@@ -170,7 +170,7 @@ class _CommentTile extends ConsumerWidget {
                   Expanded(
                     child: Text(isMine ? '$handle (${t.youLabel})' : handle,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: AppColors.violet,
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w700)),
                   ),
                   Text(formatShortTime(comment.createdAt.toLocal()),

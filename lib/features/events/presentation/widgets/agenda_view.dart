@@ -76,7 +76,7 @@ class _AgendaViewState extends State<AgendaView> {
                   shape: BoxShape.circle,
                 ),
                 selectedDecoration: BoxDecoration(
-                  color: AppColors.violet,
+                  color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
                 markerDecoration: BoxDecoration(

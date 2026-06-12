@@ -29,7 +29,7 @@ class ProfileScreen extends ConsumerWidget {
           Center(
             child: CircleAvatar(
               radius: 44,
-              backgroundColor: AppColors.violet,
+              backgroundColor: AppColors.primary,
               foregroundColor: AppColors.onAccent,
               child: Text(initials,
                   style: const TextStyle(

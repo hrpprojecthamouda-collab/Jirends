@@ -20,7 +20,7 @@ class PlaceholderBody extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: AppColors.violet),
+            Icon(icon, size: 56, color: AppColors.primary),
             const SizedBox(height: 16),
             Text(
               message,

@@ -185,8 +185,8 @@ class _MemberTile extends ConsumerWidget {
           ListTile(
             leading: CircleAvatar(
               // ignore: deprecated_member_use
-              backgroundColor: AppColors.violet.withOpacity(0.18),
-              foregroundColor: AppColors.violet,
+              backgroundColor: AppColors.primary.withOpacity(0.18),
+              foregroundColor: AppColors.primary,
               child: Text(
                   (member.profile.nickname ?? '?').characters.first.toUpperCase()),
             ),

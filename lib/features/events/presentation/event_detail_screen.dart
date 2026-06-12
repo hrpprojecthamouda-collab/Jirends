@@ -259,7 +259,7 @@ class _FollowButton extends ConsumerWidget {
         icon: Icon(following ? Icons.star : Icons.star_border, size: 18),
         label: Text(following ? t.eventFollowing : t.eventFollow),
         style: TextButton.styleFrom(
-          foregroundColor: following ? AppColors.violet : AppColors.inkMuted,
+          foregroundColor: following ? AppColors.primary : AppColors.inkMuted,
         ),
       ),
     );
@@ -421,7 +421,7 @@ class _StatusChip extends ConsumerWidget {
                     size: 12, color: AppColors.forPhaseKey(p.key)),
                 title: Text(p.label),
                 trailing: event.status == p.key
-                    ? const Icon(Icons.check, color: AppColors.violet)
+                    ? const Icon(Icons.check, color: AppColors.primary)
                     : null,
                 onTap: () => Navigator.of(sheetContext).pop(p.key),
               ),

@@ -121,7 +121,7 @@ class _EmptyView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.celebration_outlined,
-                size: 64, color: AppColors.violet),
+                size: 64, color: AppColors.primary),
             const SizedBox(height: 16),
             Text(message,
                 style: Theme.of(context).textTheme.bodyMedium,

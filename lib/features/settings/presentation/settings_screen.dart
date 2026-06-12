@@ -42,7 +42,7 @@ class SettingsScreen extends ConsumerWidget {
                 for (final locale in supportedAppLocales)
                   RadioListTile<Locale>(
                     value: locale,
-                    activeColor: AppColors.violet,
+                    activeColor: AppColors.primary,
                     title: Text(_localeLabel(locale)),
                   ),
               ],

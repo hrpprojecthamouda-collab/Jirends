@@ -130,7 +130,7 @@ class PollCard extends ConsumerWidget {
                       _ActionChip(
                         icon: Icons.how_to_vote,
                         label: t.pollClose,
-                        color: AppColors.violet,
+                        color: AppColors.primary,
                         filled: true,
                         onTap: () => actions.close(poll.id, poll.eventId),
                       )
@@ -138,7 +138,7 @@ class PollCard extends ConsumerWidget {
                       _ActionChip(
                         icon: Icons.refresh,
                         label: t.pollReopen,
-                        color: AppColors.violet,
+                        color: AppColors.primary,
                         filled: false,
                         onTap: () => actions.reopen(poll.id, poll.eventId),
                       ),
@@ -323,7 +323,7 @@ class _OptionRow extends StatelessWidget {
     final frac = total == 0 ? 0.0 : votes / total;
     final accent = isWinner
         ? AppColors.teal
-        : (selected ? AppColors.violet : AppColors.inkMuted);
+        : (selected ? AppColors.primary : AppColors.inkMuted);
 
     final clamped = frac.clamp(0.0, 1.0);
     // No Stack/Positioned/LayoutBuilder: a Column whose children stretch to the
@@ -339,7 +339,7 @@ class _OptionRow extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: selected ? AppColors.violet : AppColors.outline),
+                color: selected ? AppColors.primary : AppColors.outline),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -351,7 +351,7 @@ class _OptionRow extends StatelessWidget {
                     const Padding(
                       padding: EdgeInsets.only(right: 6),
                       child: Icon(Icons.check_circle,
-                          size: 16, color: AppColors.violet),
+                          size: 16, color: AppColors.primary),
                     ),
                   Expanded(child: Text(label)),
                   Text(t.pollVotes(votes),

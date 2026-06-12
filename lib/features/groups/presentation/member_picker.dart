@@ -70,8 +70,8 @@ Future<Profile?> showMemberPicker(
             ListTile(
               leading: CircleAvatar(
                 // ignore: deprecated_member_use
-                backgroundColor: AppColors.violet.withOpacity(0.18),
-                foregroundColor: AppColors.violet,
+                backgroundColor: AppColors.primary.withOpacity(0.18),
+                foregroundColor: AppColors.primary,
                 child: Text((p.nickname ?? '?').characters.first.toUpperCase()),
               ),
               title: Text(p.handle ?? '…'),

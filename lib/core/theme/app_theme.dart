@@ -1,10 +1,12 @@
 /// App theme. Dark-first, built from explicit [AppColors] tokens (NOT
-/// ColorScheme.fromSeed — we want the exact Kurzgesagt shades to survive). Flat,
-/// rounded, friendly. Light theme is deferred; `dark()` is the only real theme
-/// for now and `light()` returns it so callers don't break.
+/// ColorScheme.fromSeed — we want the exact sunset shades to survive). Flat,
+/// rounded, friendly; Nunito for the type. Light theme is deferred; `dark()`
+/// is the only real theme for now and `light()` returns it so callers don't
+/// break.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
@@ -15,9 +17,9 @@ abstract final class AppTheme {
 
   static ThemeData dark() {
     const scheme = ColorScheme.dark(
-      primary: AppColors.violet,
+      primary: AppColors.primary,
       onPrimary: AppColors.onAccent,
-      secondary: AppColors.blue,
+      secondary: AppColors.violet,
       onSecondary: AppColors.onAccent,
       tertiary: AppColors.teal,
       onTertiary: AppColors.onAccent,
@@ -44,17 +46,29 @@ abstract final class AppTheme {
       dividerColor: AppColors.outline,
     );
 
+    // Nunito everywhere; chunky ExtraBold headings, sturdy labels. Sizes stay
+    // on the default Material scale.
+    final nunito = GoogleFonts.nunitoTextTheme(base.textTheme).apply(
+      bodyColor: AppColors.ink,
+      displayColor: AppColors.ink,
+    );
+    final textTheme = nunito.copyWith(
+      headlineSmall: nunito.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+      titleLarge: nunito.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+      titleMedium: nunito.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+      labelLarge: nunito.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      labelMedium: nunito.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+    );
+
     return base.copyWith(
-      textTheme: base.textTheme.apply(
-        bodyColor: AppColors.ink,
-        displayColor: AppColors.ink,
-      ),
-      appBarTheme: const AppBarTheme(
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.bg,
         foregroundColor: AppColors.ink,
         elevation: 0,
         centerTitle: false,
         scrolledUnderElevation: 0,
+        titleTextStyle: textTheme.titleLarge,
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
@@ -65,18 +79,18 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.violet,
+          backgroundColor: AppColors.primary,
           foregroundColor: AppColors.onAccent,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+          textStyle: textTheme.labelLarge,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.blue),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.violet,
+        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.onAccent,
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -94,13 +108,13 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.violet, width: 2),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
       navigationRailTheme: const NavigationRailThemeData(
         backgroundColor: AppColors.surface,
         indicatorColor: AppColors.surfaceHi,
-        selectedIconTheme: IconThemeData(color: AppColors.violet),
+        selectedIconTheme: IconThemeData(color: AppColors.primary),
         unselectedIconTheme: IconThemeData(color: AppColors.inkMuted),
         labelType: NavigationRailLabelType.none,
         useIndicator: true,
@@ -111,16 +125,17 @@ abstract final class AppTheme {
         elevation: 0,
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
               color: states.contains(WidgetState.selected)
-                  ? AppColors.violet
+                  ? AppColors.primary
                   : AppColors.inkMuted,
             )),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+        labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => GoogleFonts.nunito(
               fontSize: 12,
               fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w700
-                  : FontWeight.w500,
+                  ? FontWeight.w800
+                  : FontWeight.w600,
               color: states.contains(WidgetState.selected)
-                  ? AppColors.violet
+                  ? AppColors.primary
                   : AppColors.inkMuted,
             )),
       ),
@@ -128,7 +143,7 @@ abstract final class AppTheme {
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) =>
               states.contains(WidgetState.selected)
-                  ? AppColors.violet
+                  ? AppColors.primary
                   : AppColors.surfaceHi),
           foregroundColor: WidgetStateProperty.resolveWith((states) =>
               states.contains(WidgetState.selected)
