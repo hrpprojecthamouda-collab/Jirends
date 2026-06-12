@@ -195,6 +195,8 @@
   "detailWhere": "Win",
 
   "membersTitle": "El-membres",
+  "membersCount": "{count, plural, =0{Famma chay membre} =1{1 membre} other{{count} membres}}",
+  "membersNoReply": "Mazel ma jawebch",
   "memberRoleOrganizer": "Mounaddhem",
   "memberRoleMember": "Membre",
   "rsvpPending": "Fi el-intidhar",

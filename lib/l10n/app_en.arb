@@ -216,6 +216,9 @@
   "detailWhere": "Where",
 
   "membersTitle": "Members",
+  "membersCount": "{count, plural, =0{No members} =1{1 member} other{{count} members}}",
+  "@membersCount": { "placeholders": { "count": { "type": "int" } } },
+  "membersNoReply": "No reply",
   "memberRoleOrganizer": "Organizer",
   "memberRoleMember": "Member",
   "rsvpPending": "Pending",

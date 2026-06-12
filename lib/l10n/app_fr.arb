@@ -194,6 +194,8 @@
   "detailWhere": "Où",
 
   "membersTitle": "Membres",
+  "membersCount": "{count, plural, =0{Aucun membre} =1{1 membre} other{{count} membres}}",
+  "membersNoReply": "Sans réponse",
   "memberRoleOrganizer": "Organisateur",
   "memberRoleMember": "Membre",
   "rsvpPending": "En attente",

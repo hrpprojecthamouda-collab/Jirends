@@ -51,6 +51,7 @@ class MembersTab extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
             children: [
+              _RsvpSummaryCard(members: members),
               for (final m in members)
                 _MemberTile(
                   event: event,
@@ -66,6 +67,95 @@ class MembersTab extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Counts + a stacked proportion bar for the event's RSVPs: going / maybe /
+/// declined / no reply (pending). Pure presentation over the already-loaded
+/// member list — no extra fetch, no visibility logic.
+class _RsvpSummaryCard extends StatelessWidget {
+  const _RsvpSummaryCard({required this.members});
+  final List<EventMember> members;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final going = members.where((m) => m.rsvp == RsvpStatus.going).length;
+    final maybe = members.where((m) => m.rsvp == RsvpStatus.maybe).length;
+    final declined = members.where((m) => m.rsvp == RsvpStatus.declined).length;
+    final noReply = members.length - going - maybe - declined;
+
+    // (status, count, color) in display order.
+    final entries = <(String, int, Color)>[
+      (t.rsvpGoing, going, AppColors.teal),
+      (t.rsvpMaybe, maybe, AppColors.yellow),
+      (t.rsvpDeclined, declined, AppColors.coral),
+      (t.membersNoReply, noReply, AppColors.inkMuted),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.membersCount(members.length),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            // Stacked proportion bar: flex-only segments in a bounded Row —
+            // the same safe idiom as the poll tally bars.
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                height: 6,
+                child: Row(
+                  children: [
+                    for (final (_, count, color) in entries)
+                      if (count > 0)
+                        Expanded(
+                          flex: count,
+                          child: Container(
+                            // ignore: deprecated_member_use
+                            color: color.withOpacity(
+                                color == AppColors.inkMuted ? 0.35 : 0.85),
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              children: [
+                for (final (label, count, color) in entries)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                            color: color, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 5),
+                      Text('$count $label',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(color: AppColors.inkMuted)),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
