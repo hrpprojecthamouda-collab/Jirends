@@ -1,6 +1,7 @@
-/// Friends — the caller's directional address book. Add by handle, see your
-/// friends, remove them. No visibility logic: the list is whatever the friends
-/// RLS returns (always only your own rows).
+/// Friends — the caller's address book. Add by handle (mutual — they see you
+/// back immediately), see your friends, remove them (one-sided). No
+/// visibility logic: the list is whatever the friends RLS returns (always
+/// only your own rows).
 library;
 
 import 'package:flutter/material.dart';

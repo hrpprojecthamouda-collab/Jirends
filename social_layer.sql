@@ -1,9 +1,12 @@
 -- social_layer.sql — friends & friend groups (apply SECOND, after schema.sql).
 --
 -- TWO INVARIANTS (from CLAUDE.md):
---  1. Friends are DIRECTIONAL, no request/accept. add_friend_by_handle puts
---     someone in MY address book only; it does not add me to theirs.
---     is_friend(uid) means "uid is in the CALLER's address book".
+--  1. Friends are MUTUAL, no request/accept. add_friend_by_handle writes BOTH
+--     the caller's row AND the target's row in one call — the moment you add
+--     someone, they see you back too. is_friend(uid) means "uid is in the
+--     CALLER's address book", which (post-add) holds for both sides.
+--     Removing a friend is still one-sided: only YOUR row is deleted, the
+--     other person keeps you in their book unless they remove you too.
 --  2. Friend groups are a SELECTION SHORTCUT, never a permission. A group is
 --     never linked to an event. assign_group_to_event expands the group into
 --     individual event_members rows at add-time. Changing a group later must
@@ -11,8 +14,10 @@
 --     source of truth for visibility.
 
 -- ────────────────────────────────────────────────────────────────────────────
--- friends — directional address book. (owner_id) -> (friend_id) means
--- friend_id is in owner_id's book. The reverse is a separate row, if it exists.
+-- friends — mutual address book, stored as one row per direction.
+-- (owner_id) -> (friend_id) means friend_id is in owner_id's book.
+-- add_friend_by_handle always writes both directions; removal only ever
+-- deletes the caller's own row (see invariant 1 above).
 -- ────────────────────────────────────────────────────────────────────────────
 create table if not exists public.friends (
   owner_id   uuid not null references public.profiles(id) on delete cascade,
@@ -69,9 +74,10 @@ grant execute on function public.is_friend(uuid) to authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- add_friend_by_handle — parse 'nickname#tagline', resolve to a profile, add to
--- the caller's address book. Directional: only the caller's row is written.
--- Returns the friend's profile id. Raises a clear error if the handle is
--- malformed or unknown, or if you try to friend yourself.
+-- BOTH address books in one call (mutual, no accept step): the caller's row
+-- AND the target's row are written, so the target sees the caller back
+-- immediately. Returns the friend's profile id. Raises a clear error if the
+-- handle is malformed or unknown, or if you try to friend yourself.
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.add_friend_by_handle(p_handle text)
 returns uuid
@@ -114,8 +120,10 @@ begin
       using errcode = 'invalid_parameter_value';
   end if;
 
+  -- Mutual: write both directions in one statement so the target sees the
+  -- caller back immediately, no accept step.
   insert into public.friends (owner_id, friend_id)
-  values (v_me, v_friend)
+  values (v_me, v_friend), (v_friend, v_me)
   on conflict (owner_id, friend_id) do nothing;
 
   return v_friend;

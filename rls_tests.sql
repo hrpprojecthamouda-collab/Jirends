@@ -71,7 +71,7 @@ begin
   if not ok then raise exception '❌ ASSERTION FAILED: claiming an existing handle (any case) must be blocked'; end if;
 
   -- ════════════════════════════════════════════════════════════════════════
-  -- TEST 2 — friends are DIRECTIONAL.
+  -- TEST 2 — friends are MUTUAL (no accept step), but REMOVAL is one-sided.
   -- ════════════════════════════════════════════════════════════════════════
   perform set_config('role','authenticated',true);
   perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
@@ -88,9 +88,20 @@ begin
   begin perform public.add_friend_by_handle('Alice#TheCrew'); exception when others then ok := true; end;
   if not ok then raise exception '❌ ASSERTION FAILED: friending yourself must fail'; end if;
 
-  -- directional: Bob must NOT see Alice
+  -- mutual: Bob must see Alice back, with no action on Bob's part.
   perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
-  if public.is_friend(alice) then raise exception '❌ ASSERTION FAILED: friendship must be directional (Bob should NOT see Alice)'; end if;
+  if not public.is_friend(alice) then raise exception '❌ ASSERTION FAILED: adding is mutual (Bob should see Alice back)'; end if;
+
+  -- removal is one-sided: Alice removing Bob must not touch Bob's row for Alice.
+  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+  delete from public.friends where owner_id = alice and friend_id = bob;
+  if public.is_friend(bob) then raise exception '❌ ASSERTION FAILED: Alice removed Bob, should no longer see him'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+  if not public.is_friend(alice) then raise exception '❌ ASSERTION FAILED: removal is one-sided — Bob should still see Alice'; end if;
+
+  -- re-add for the rest of the spec, which assumes Alice<->Bob are friends.
+  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+  perform public.add_friend_by_handle('Bob#TheCrew');
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 3 — THE CARDINAL RULE. Surprise party for Dave; Dave sees nothing.

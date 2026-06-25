@@ -1,10 +1,12 @@
-/// FriendRepository — the caller's directional address book. A "friend" for the
-/// UI is just the [Profile] of someone in your `friends` table, so we reuse
-/// Profile rather than introduce a new model.
+/// FriendRepository — the caller's address book. A "friend" for the UI is just
+/// the [Profile] of someone in your `friends` table, so we reuse Profile
+/// rather than introduce a new model.
 ///
-/// Friendship is directional (see social_layer.sql): adding someone puts them in
-/// YOUR book only. There is no request/accept. `is_friend` / the friends RLS
-/// already scope everything to the caller, so there is no visibility logic here.
+/// Friendship is mutual (see social_layer.sql): adding someone by handle adds
+/// you to each other's books in the same call, no request/accept. Removing is
+/// one-sided — it only ever deletes your own row. `is_friend` / the friends
+/// RLS already scope everything to the caller, so there is no visibility
+/// logic here.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,9 +55,10 @@ class FriendRepository {
   }
 
   /// Add a friend by their `nickname#tagline` handle. Calls the SECURITY DEFINER
-  /// RPC which validates the handle, resolves the profile, and writes the
-  /// caller's directional row. Returns the friend's id. Maps a malformed/unknown
-  /// handle and self-add to typed failures.
+  /// RPC which validates the handle, resolves the profile, and writes BOTH
+  /// directions (mutual — the target sees the caller back immediately, no
+  /// accept step). Returns the friend's id. Maps a malformed/unknown handle
+  /// and self-add to typed failures.
   Future<String> addByHandle(String handle) async {
     try {
       final id = await _client
@@ -66,8 +69,10 @@ class FriendRepository {
     }
   }
 
-  /// Remove someone from the caller's address book (directional — only affects
-  /// your row). RLS lets you delete only your own friends rows.
+  /// Remove someone from the caller's address book. Deliberately one-sided
+  /// (unlike adding): only your row is deleted, the other person keeps you in
+  /// their own book unless they remove you too. RLS lets you delete only your
+  /// own friends rows.
   Future<void> removeFriend(String friendId) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw const AuthFailure('You are not signed in.');
