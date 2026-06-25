@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../application/auth_controller.dart';
+import 'widgets/dev_account_switcher.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -96,6 +97,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     onPressed: loading ? null : () => context.go(AppRoutes.signUp),
                     child: Text(t.authCreateAccount),
                   ),
+                  const DevAccountSwitcher(),
                 ],
               ),
             ),

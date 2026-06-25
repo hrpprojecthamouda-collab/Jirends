@@ -10,6 +10,7 @@ import '../../../core/i18n/locale_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/presentation/widgets/dev_account_switcher.dart';
 
 /// The display name to show for each supported locale, in its own language.
 String _localeLabel(Locale l) => switch (l.languageCode) {
@@ -47,6 +48,10 @@ class SettingsScreen extends ConsumerWidget {
                   ),
               ],
             ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: DevAccountSwitcher(),
           ),
           const Divider(),
           ListTile(
