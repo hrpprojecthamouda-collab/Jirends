@@ -90,6 +90,40 @@ class EventDetailRepository {
       throw mapToFailure(e);
     }
   }
+
+  /// Per-member "has a scheduling conflict elsewhere" flags for this event's
+  /// roster, in one round-trip. BOOLEAN ONLY — the RPC never returns which
+  /// other event is conflicting, so this can never leak an event a third
+  /// party (the caller, viewing someone else's card) isn't allowed to see.
+  Future<Map<String, bool>> fetchMemberConflicts(String eventId) async {
+    try {
+      final rows = await _client
+          .rpc('event_member_conflicts', params: {'p_event': eventId});
+      return {
+        for (final r in (rows as List))
+          (r as Map)['user_id'] as String: r['has_conflict'] as bool,
+      };
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
+
+  /// The CALLER's own other events that overlap this one (by title). Always
+  /// safe to show in full: the caller is, by definition, a member of every
+  /// event returned here.
+  Future<List<({String id, String title})>> fetchMyConflicts(
+      String eventId) async {
+    try {
+      final rows =
+          await _client.rpc('my_conflicting_events', params: {'p_event': eventId});
+      return [
+        for (final r in (rows as List))
+          (id: (r as Map)['id'] as String, title: r['title'] as String),
+      ];
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
 }
 
 final eventDetailRepositoryProvider = Provider<EventDetailRepository>((ref) {

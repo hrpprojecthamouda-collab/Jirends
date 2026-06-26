@@ -17,6 +17,7 @@ import '../../../groups/application/group_list_controller.dart';
 import '../../../groups/presentation/member_picker.dart';
 import '../../application/event_detail_controller.dart';
 import '../../data/event.dart';
+import '../../data/event_detail_repository.dart';
 import '../../data/event_member.dart';
 import '../event_detail_screen.dart';
 
@@ -178,6 +179,11 @@ class _MemberTile extends ConsumerWidget {
     final handle = member.profile.handle ?? '…';
     final roleLabel =
         member.isOrganizer ? t.memberRoleOrganizer : t.memberRoleMember;
+    // Boolean-only flag (see EventDetailRepository.fetchMemberConflicts) — no
+    // event name/time ever reaches this widget, so it can't leak a hidden
+    // event regardless of which one is conflicting.
+    final conflicts = ref.watch(memberConflictsProvider(event.id)).value;
+    final hasConflict = conflicts?[member.userId] ?? false;
 
     return Card(
       child: Column(
@@ -191,8 +197,21 @@ class _MemberTile extends ConsumerWidget {
                   (member.profile.nickname ?? '?').characters.first.toUpperCase()),
             ),
             title: Text(isMe ? '$handle (${t.youLabel})' : handle),
-            subtitle: Text(roleLabel,
-                style: const TextStyle(color: AppColors.inkMuted)),
+            subtitle: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(roleLabel,
+                    style: const TextStyle(color: AppColors.inkMuted)),
+                if (hasConflict) ...[
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: t.memberConflictTooltip,
+                    child: const Icon(Icons.warning_amber_outlined,
+                        size: 14, color: AppColors.coral),
+                  ),
+                ],
+              ],
+            ),
             trailing: canManage
                 ? IconButton(
                     tooltip: isMe ? t.leaveEvent : t.removeMember,
@@ -354,7 +373,32 @@ class _AddMenu extends ConsumerWidget {
       await ref
           .read(memberActionsControllerProvider.notifier)
           .addMember(event.id, picked.id);
+      if (!context.mounted) return;
+      await _warnIfConflicted(context, ref, {picked.id: picked.handle ?? '…'});
     }
+  }
+
+  /// After an add succeeds, re-check the (just-invalidated) conflict flags and
+  /// show a follow-up warning for anyone newly added who's double-booked.
+  /// Boolean-only — names the PERSON (the organizer already knows who they
+  /// just added) but never the other event.
+  Future<void> _warnIfConflicted(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, String> addedIdToHandle,
+  ) async {
+    if (addedIdToHandle.isEmpty) return;
+    final t = AppLocalizations.of(context);
+    final conflicts =
+        await ref.read(eventDetailRepositoryProvider).fetchMemberConflicts(event.id);
+    final conflictedNames = [
+      for (final entry in addedIdToHandle.entries)
+        if (conflicts[entry.key] == true) entry.value,
+    ];
+    if (conflictedNames.isEmpty || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(t.addedWithConflict(conflictedNames.join(', ')))),
+    );
   }
 
   Future<void> _addGroup(BuildContext context, WidgetRef ref) async {
@@ -366,6 +410,7 @@ class _AddMenu extends ConsumerWidget {
       emptyMessage: t.noGroupsToAdd,
     );
     if (picked != null) {
+      final beforeIds = members.map((m) => m.userId).toSet();
       final added = await ref
           .read(memberActionsControllerProvider.notifier)
           .addGroup(event.id, picked);
@@ -373,6 +418,7 @@ class _AddMenu extends ConsumerWidget {
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(SnackBar(content: Text(t.addedToEvent(added))));
+        await _warnIfConflictedAmongNewMembers(context, ref, beforeIds);
       }
     }
   }
@@ -386,6 +432,7 @@ class _AddMenu extends ConsumerWidget {
       emptyMessage: t.noCrewsToAdd,
     );
     if (picked != null) {
+      final beforeIds = members.map((m) => m.userId).toSet();
       final added = await ref
           .read(memberActionsControllerProvider.notifier)
           .addCrew(event.id, picked);
@@ -393,7 +440,26 @@ class _AddMenu extends ConsumerWidget {
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(SnackBar(content: Text(t.addedToEvent(added))));
+        await _warnIfConflictedAmongNewMembers(context, ref, beforeIds);
       }
     }
+  }
+
+  /// Bulk adds (group/crew) don't return WHO was added, only a count — diff
+  /// the member list before/after to find the new arrivals, then run the same
+  /// boolean-only conflict check on each.
+  Future<void> _warnIfConflictedAmongNewMembers(
+    BuildContext context,
+    WidgetRef ref,
+    Set<String> beforeIds,
+  ) async {
+    final after =
+        await ref.read(eventDetailRepositoryProvider).fetchMembers(event.id);
+    final newMembers = after.where((m) => !beforeIds.contains(m.userId));
+    final addedIdToHandle = {
+      for (final m in newMembers) m.userId: m.profile.handle ?? '…',
+    };
+    if (!context.mounted) return;
+    await _warnIfConflicted(context, ref, addedIdToHandle);
   }
 }

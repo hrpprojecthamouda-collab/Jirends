@@ -25,6 +25,23 @@ final eventPhasesProvider =
   return ref.watch(eventTypeRepositoryProvider).fetchPhases(type);
 });
 
+/// Per-member "has a scheduling conflict elsewhere" flags for this event's
+/// roster (boolean only — see EventDetailRepository.fetchMemberConflicts).
+/// One-shot, like eventPollsProvider: invalidated explicitly after any
+/// member-add action so the flags reflect the new roster.
+final memberConflictsProvider =
+    FutureProvider.family<Map<String, bool>, String>((ref, eventId) {
+  return ref.watch(eventDetailRepositoryProvider).fetchMemberConflicts(eventId);
+});
+
+/// The CALLER's own other events that overlap this one (titles — always safe,
+/// see EventDetailRepository.fetchMyConflicts).
+final myConflictsProvider =
+    FutureProvider.family<List<({String id, String title})>, String>(
+        (ref, eventId) {
+  return ref.watch(eventDetailRepositoryProvider).fetchMyConflicts(eventId);
+});
+
 class MemberActionsController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -39,6 +56,7 @@ class MemberActionsController extends AsyncNotifier<void> {
   Future<void> addMember(String eventId, String userId) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.addMember(eventId, userId));
+    if (!state.hasError) ref.invalidate(memberConflictsProvider(eventId));
   }
 
   Future<void> removeMember(String eventId, String userId) async {
@@ -56,6 +74,7 @@ class MemberActionsController extends AsyncNotifier<void> {
           .read(groupRepositoryProvider)
           .assignGroupToEvent(groupId, eventId);
     });
+    if (!state.hasError) ref.invalidate(memberConflictsProvider(eventId));
     return state.hasError ? null : added;
   }
 
@@ -68,6 +87,7 @@ class MemberActionsController extends AsyncNotifier<void> {
           .read(crewRepositoryProvider)
           .assignCrewToEvent(crewId, eventId);
     });
+    if (!state.hasError) ref.invalidate(memberConflictsProvider(eventId));
     return state.hasError ? null : added;
   }
 }

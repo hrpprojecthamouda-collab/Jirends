@@ -244,6 +244,87 @@ grant execute on function public.is_event_member(uuid)    to authenticated;
 grant execute on function public.is_event_organizer(uuid) to authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- TIME CONFLICT DETECTION. Pure read-side computation over events/
+-- event_members — no new table, no write path. Safety lives entirely in what
+-- each function chooses to RETURN:
+--   has_time_conflict / event_member_conflicts -> BOOLEAN ONLY, never an
+--     event id/title, so a third party (organizer, fellow member) can never
+--     learn WHAT or WHERE someone else is busy with — only THAT they are.
+--   my_conflicting_events -> the caller's OWN event titles only (auth.uid()
+--     is hardcoded, never a parameter), which is always safe: a user can
+--     already read the title of any event they're a member of.
+-- An event with starts_at but no ends_at occupies a default 2-HOUR block for
+-- overlap purposes. Events with no starts_at at all never conflict (no time
+-- to overlap).
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- "Does p_user have any OTHER event that overlaps p_event's time window?"
+-- SECURITY DEFINER (like is_friend/is_event_member): bypasses RLS to read
+-- p_user's other event_members rows, but the boolean return carries no
+-- identifying information, so the bypass leaks nothing.
+create or replace function public.has_time_conflict(p_user uuid, p_event uuid)
+returns boolean
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1
+    from public.events e0
+    join public.event_members em on em.user_id = p_user and em.event_id <> p_event
+    join public.events e1 on e1.id = em.event_id
+    where e0.id = p_event
+      and e0.starts_at is not null
+      and e1.starts_at is not null
+      and tstzrange(e0.starts_at, coalesce(e0.ends_at, e0.starts_at + interval '2 hours'))
+          && tstzrange(e1.starts_at, coalesce(e1.ends_at, e1.starts_at + interval '2 hours'))
+  );
+$$;
+revoke all on function public.has_time_conflict(uuid, uuid) from public;
+grant execute on function public.has_time_conflict(uuid, uuid) to authenticated;
+
+-- One round-trip for the whole Members tab instead of one has_time_conflict
+-- call per member. Caller must already be a member of p_event (so a
+-- non-member can't probe an arbitrary event's roster for conflicts).
+create or replace function public.event_member_conflicts(p_event uuid)
+returns table(user_id uuid, has_conflict boolean)
+language plpgsql stable security definer set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_event_member(p_event) then
+    return;
+  end if;
+  return query
+    select m.user_id, public.has_time_conflict(m.user_id, p_event)
+    from public.event_members m
+    where m.event_id = p_event;
+end;
+$$;
+revoke all on function public.event_member_conflicts(uuid) from public;
+grant execute on function public.event_member_conflicts(uuid) to authenticated;
+
+-- "Which of MY OWN other events overlap p_event?" auth.uid() is hardcoded
+-- (never a parameter) so this can never be pointed at someone else; returning
+-- titles is safe because the caller is, by definition, already a member of
+-- both events. SECURITY INVOKER (ordinary RLS) is enough -- is_event_member
+-- guards entry, and the embedded events are the caller's own membership rows.
+create or replace function public.my_conflicting_events(p_event uuid)
+returns table(id uuid, title text)
+language sql stable security invoker set search_path = public, pg_temp
+as $$
+  select e1.id, e1.title
+  from public.events e0
+  join public.event_members em on em.user_id = auth.uid() and em.event_id <> p_event
+  join public.events e1 on e1.id = em.event_id
+  where e0.id = p_event
+    and public.is_event_member(p_event)
+    and e0.starts_at is not null
+    and e1.starts_at is not null
+    and tstzrange(e0.starts_at, coalesce(e0.ends_at, e0.starts_at + interval '2 hours'))
+        && tstzrange(e1.starts_at, coalesce(e1.ends_at, e1.starts_at + interval '2 hours'));
+$$;
+revoke all on function public.my_conflicting_events(uuid) from public;
+grant execute on function public.my_conflicting_events(uuid) to authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- SURPRISE GUARD — second line of defence. Refuse to insert the event's
 -- surprise_target as a member. (First line: callers simply don't add them.)
 -- ════════════════════════════════════════════════════════════════════════════

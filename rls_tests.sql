@@ -607,6 +607,94 @@ begin
     if not nok then raise exception '❌ TEST15: a client must not be able to change kind via UPDATE'; end if;
   end;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 16 — TIME CONFLICT DETECTION. has_time_conflict /
+  -- event_member_conflicts return a BOOLEAN ONLY (never an event id/title) so
+  -- a third party can learn THAT someone is busy but never WHAT/WHERE;
+  -- my_conflicting_events returns the CALLER's own event titles only
+  -- (auth.uid() hardcoded, never a parameter) and is always safe. Covers
+  -- overlap math, the no-ends_at 2h default, the per-event membership gate,
+  -- and the cardinal case: Bob's only conflict is DAVE'S SURPRISE EVENT (`ev`,
+  -- target Dave) — the boolean still shows true for Bob, but carries no event
+  -- reference, so nothing about the surprise leaks through this channel.
+  -- ════════════════════════════════════════════════════════════════════════
+  declare
+    cx uuid; cy uuid; cz_noend uuid; cprobe_in uuid; cprobe_out uuid;
+    cconflict boolean; ccnt int; ctitle text;
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+
+    -- X (18:00-20:00) and Y (19:00-21:00) overlap; Bob is in both, plus `ev`
+    -- (the surprise event — Bob is a legitimate member; Dave is its target).
+    insert into public.events (title,event_type,created_by,starts_at,ends_at) values
+      ('Conflict X','dinner',alice,'2026-09-01T18:00:00Z','2026-09-01T20:00:00Z') returning id into cx;
+    insert into public.events (title,event_type,created_by,starts_at,ends_at) values
+      ('Conflict Y','dinner',alice,'2026-09-01T19:00:00Z','2026-09-01T21:00:00Z') returning id into cy;
+    insert into public.event_members (event_id,user_id,added_by) values (cx,bob,alice);
+    insert into public.event_members (event_id,user_id,added_by) values (cy,bob,alice);
+
+    select public.has_time_conflict(bob, cx) into cconflict;
+    if not cconflict then raise exception '❌ TEST16: Bob should conflict on X (overlaps Y)'; end if;
+    select public.has_time_conflict(bob, cy) into cconflict;
+    if not cconflict then raise exception '❌ TEST16: Bob should conflict on Y (overlaps X)'; end if;
+    select public.has_time_conflict(carol, cx) into cconflict;
+    if cconflict then raise exception '❌ TEST16: Carol should NOT conflict (not in Y)'; end if;
+
+    -- no-ends_at default 2h window: 10:00 (no end) occupies the implied 10-12.
+    insert into public.events (title,event_type,created_by,starts_at) values
+      ('NoEnd','dinner',alice,'2026-09-02T10:00:00Z') returning id into cz_noend;
+    insert into public.events (title,event_type,created_by,starts_at,ends_at) values
+      ('ProbeIn','dinner',alice,'2026-09-02T11:00:00Z','2026-09-02T11:30:00Z') returning id into cprobe_in;
+    insert into public.events (title,event_type,created_by,starts_at,ends_at) values
+      ('ProbeOut','dinner',alice,'2026-09-02T12:30:00Z','2026-09-02T13:00:00Z') returning id into cprobe_out;
+    insert into public.event_members (event_id,user_id,added_by) values (cz_noend,bob,alice);
+    insert into public.event_members (event_id,user_id,added_by) values (cprobe_in,bob,alice);
+    insert into public.event_members (event_id,user_id,added_by) values (cprobe_out,bob,alice);
+
+    select public.has_time_conflict(bob, cprobe_in) into cconflict;
+    if not cconflict then raise exception '❌ TEST16: ProbeIn (11-11:30) should conflict with NoEnd''s implied 10-12'; end if;
+    select public.has_time_conflict(bob, cprobe_out) into cconflict;
+    if cconflict then raise exception '❌ TEST16: ProbeOut (12:30-13) should NOT conflict with NoEnd''s implied 10-12'; end if;
+
+    -- event_member_conflicts: one round-trip, callable by a non-organizer
+    -- member; non-members get nothing back.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ccnt from public.event_member_conflicts(cx) r where r.user_id=bob and r.has_conflict;
+    if ccnt <> 1 then raise exception '❌ TEST16: event_member_conflicts should show Bob=true on X'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    select count(*) into ccnt from public.event_member_conflicts(cz_noend);
+    if ccnt <> 0 then raise exception '❌ TEST16: a non-member must get an empty result from event_member_conflicts'; end if;
+
+    -- my_conflicting_events: Bob asking about X gets back Y's title (his own
+    -- data only); asking about an event he's not in returns nothing.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ccnt from public.my_conflicting_events(cx);
+    if ccnt <> 1 then raise exception '❌ TEST16: Bob should have exactly 1 conflicting event for X (got %)', ccnt; end if;
+    select title into ctitle from public.my_conflicting_events(cx) limit 1;
+    if ctitle <> 'Conflict Y' then raise exception '❌ TEST16: Bob''s conflict for X should be titled Conflict Y (got %)', ctitle; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    select count(*) into ccnt from public.my_conflicting_events(cy); -- Carol isn't a member of Y
+    if ccnt <> 0 then raise exception '❌ TEST16: my_conflicting_events must be empty for a non-member call'; end if;
+
+    -- CARDINAL: Bob's surprise-event membership (`ev`, target Dave) can make
+    -- him show as conflicted to a third party, but that boolean carries no
+    -- event reference — and Dave himself never gets a boolean about Bob at
+    -- all here (he'd have to be a member of the probed event, which as the
+    -- surprise target he structurally can't be).
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    -- Structural guarantee: the function's return TYPE is boolean, full stop
+    -- — it is impossible for it to carry an event id/title.
+    if (select prorettype::regtype::text from pg_proc where proname='has_time_conflict') <> 'boolean' then
+      raise exception '❌ CARDINAL (TEST16): has_time_conflict must return boolean only, never identify an event';
+    end if;
+    -- Dave cannot call event_member_conflicts for `ev` at all in a way that
+    -- reveals anything since he is never event_id-listed as a member; confirm
+    -- he is excluded from the result set entirely (not merely false).
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ccnt from public.event_member_conflicts(ev) r where r.user_id = dave;
+    if ccnt <> 0 then raise exception '❌ CARDINAL (TEST16): Dave must not appear in ev''s member-conflicts at all'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);

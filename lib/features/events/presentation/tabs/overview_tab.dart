@@ -25,12 +25,22 @@ class OverviewTab extends ConsumerWidget {
     final myId = ref.watch(currentUserIdProvider);
     final members = ref.watch(eventMembersProvider(event.id)).value ?? const [];
     final isOrganizer = isCurrentUserOrganizer(members, myId);
+    final myConflicts = ref.watch(myConflictsProvider(event.id)).value ?? const [];
 
     final edit = ref.read(editEventControllerProvider.notifier);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
+        // Self-conflict banner: safe to name the other event here — the
+        // viewer is, by definition, a member of both (see myConflictsProvider).
+        if (myConflicts.isNotEmpty)
+          _ConflictBanner(
+            text: t.eventConflictBanner(
+              myConflicts.length,
+              myConflicts.map((c) => c.title).join(', '),
+            ),
+          ),
         // Description block — bigger. Soft separation only (label + hairline).
         _Block(
           label: t.detailDescription,
@@ -70,6 +80,61 @@ class OverviewTab extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A dismissible-for-this-session warning banner shown to a member who has a
+/// time conflict between THIS event and another one they're also in. Safe to
+/// name the other event: the viewer is necessarily a member of both.
+class _ConflictBanner extends StatefulWidget {
+  const _ConflictBanner({required this.text});
+  final String text;
+
+  @override
+  State<_ConflictBanner> createState() => _ConflictBannerState();
+}
+
+class _ConflictBannerState extends State<_ConflictBanner> {
+  bool _dismissed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+        decoration: BoxDecoration(
+          // ignore: deprecated_member_use
+          color: AppColors.coral.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.coral),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_outlined,
+                size: 18, color: AppColors.coral),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Text(widget.text,
+                    style: const TextStyle(color: AppColors.coral)),
+              ),
+            ),
+            InkWell(
+              onTap: () => setState(() => _dismissed = true),
+              borderRadius: BorderRadius.circular(16),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.close, size: 16, color: AppColors.coral),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
