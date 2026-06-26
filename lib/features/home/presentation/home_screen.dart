@@ -12,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../notifications/presentation/widgets/notification_bell_button.dart';
 import '../../profile/presentation/profile_avatar_button.dart';
 import '../../shell/presentation/placeholder_body.dart';
 import '../application/activity_controller.dart';
@@ -29,6 +30,7 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: const ProfileAvatarButton(),
         title: Text(t.homeTitle),
+        actions: const [NotificationBellButton()],
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(activityFeedProvider),

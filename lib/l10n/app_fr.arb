@@ -23,6 +23,14 @@
   "activityItem": "Nouvelle tâche sur {event}",
   "activitySomeone": "Quelqu’un",
 
+  "notificationsTitle": "Notifications",
+  "notificationsEmpty": "Aucune notification.",
+  "notificationFriendAdded": "{who} vous a ajouté en ami",
+  "notificationCrewAdded": "{who} vous a ajouté à {crew}",
+  "notificationEventMemberAdded": "{who} vous a ajouté à {event}",
+  "notificationEventCancelled": "{event} a été annulé",
+  "notificationEventConfirmed": "{event} est confirmé",
+
   "friendsTitle": "Amis",
   "friendsComingSoon": "Les amis arrivent bientôt — ajoutez des gens par leur identifiant et constituez votre groupe.",
   "friendsEmpty": "Aucun ami pour l’instant. Ajoutez quelqu’un par son identifiant pour constituer votre groupe.",

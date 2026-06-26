@@ -277,3 +277,8 @@ begin
     begin alter publication supabase_realtime add table public.friend_group_members; exception when duplicate_object then null; end;
   end if;
 end$$;
+
+-- NOTE: the `notifications` table (and its triggers, incl. notify_friend_added
+-- on this table) lives in crews.sql, not here — notifications.crew_id
+-- references public.crews(id), which doesn't exist until crews.sql is applied
+-- (apply order: schema.sql -> social_layer.sql -> event_types.sql -> crews.sql).

@@ -16,6 +16,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../notifications/presentation/widgets/notification_bell_button.dart';
 import '../../profile/presentation/profile_avatar_button.dart';
 import '../application/crew_list_controller.dart';
 import '../application/group_list_controller.dart';
@@ -38,6 +39,7 @@ class GroupsScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: const ProfileAvatarButton(),
         title: Text(t.groupsTitle),
+        actions: const [NotificationBellButton()],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),

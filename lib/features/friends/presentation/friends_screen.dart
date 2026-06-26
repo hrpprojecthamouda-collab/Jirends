@@ -12,6 +12,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/profile.dart';
 import '../../groups/presentation/group_dialogs.dart';
+import '../../notifications/presentation/widgets/notification_bell_button.dart';
 import '../../profile/presentation/profile_avatar_button.dart';
 import '../../shell/presentation/placeholder_body.dart';
 import '../application/friend_list_controller.dart';
@@ -37,6 +38,7 @@ class FriendsScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: const ProfileAvatarButton(),
         title: Text(t.friendsTitle),
+        actions: const [NotificationBellButton()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddDialog(context, ref),

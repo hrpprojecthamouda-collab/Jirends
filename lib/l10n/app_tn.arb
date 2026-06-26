@@ -24,6 +24,14 @@
   "activityItem": "Mohem jdid fi {event}",
   "activitySomeone": "Wa7ed",
 
+  "notificationsTitle": "Notifications",
+  "notificationsEmpty": "Mazel famma chay notification.",
+  "notificationFriendAdded": "{who} zedek f ashabou",
+  "notificationCrewAdded": "{who} zedek fi {crew}",
+  "notificationEventMemberAdded": "{who} zedek fi {event}",
+  "notificationEventCancelled": "{event} etlagha",
+  "notificationEventConfirmed": "{event} confirmé",
+
   "friendsTitle": "Ashab",
   "friendsComingSoon": "El-ashab jayin qrib — zid el-nas b el-handle mte3hom w abni el-grupe mte3ek.",
   "friendsEmpty": "Mazel famma chay sahbek. Zid wa7ed b el-handle mte3ou bech tabni el-grupe mte3ek.",

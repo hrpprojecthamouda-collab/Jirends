@@ -501,6 +501,112 @@ begin
     if not ok then raise exception '❌ TEST14: an unparseable date value must be rejected'; end if;
   end;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 15 — NOTIFICATIONS. The first PER-RECIPIENT table: a user only ever
+  -- reads their own rows. Covers friend_added (mutual fan-out), crew_added
+  -- (self-add skipped), event_member_added (individual + crew-expansion
+  -- fan-out; creator's own auto-add skipped), event_confirmed (fires once,
+  -- not on intermediate planning, not on re-advance, actor self-skipped),
+  -- event_cancelled, the cardinal rule, and cross-user RLS isolation.
+  -- (Reuses ev/ev_crew/crew/alice/bob/carol/dave from earlier tests.)
+  -- ════════════════════════════════════════════════════════════════════════
+  declare
+    nev uuid; ncnt int; nok boolean;
+  begin
+    -- FRIEND_ADDED: mutual — each side reads their OWN notification. TEST 2
+    -- added, removed, then re-added Alice<->Bob, so each legitimately got 2
+    -- separate friend_added notifications (remove+re-add is a fresh insert,
+    -- not a no-op conflict) — assert "at least 1", the mutual fan-out itself.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='friend_added' and actor_id=alice;
+    if ncnt < 1 then raise exception '❌ TEST15: Bob should see >=1 friend_added from Alice (got %)', ncnt; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=alice and kind='friend_added' and actor_id=bob;
+    if ncnt < 1 then raise exception '❌ TEST15: Alice should see >=1 friend_added from Bob (got %)', ncnt; end if;
+
+    -- CREW_ADDED: Bob was added to `crew` earlier (TEST 9); self-add (Dave,
+    -- added by Alice -- not himself) does NOT apply here, so just check Bob.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='crew_added' and crew_id=crew;
+    if ncnt <> 1 then raise exception '❌ TEST15: Bob should see 1 crew_added (got %)', ncnt; end if;
+
+    -- EVENT_MEMBER_ADDED: creator's own auto-add must not self-notify; Bob's
+    -- direct add to `ev` (TEST 3) must notify him exactly once.
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=alice and kind='event_member_added' and event_id=ev;
+    if ncnt <> 0 then raise exception '❌ TEST15: creator auto-add must not self-notify (got %)', ncnt; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_member_added' and event_id=ev;
+    if ncnt <> 1 then raise exception '❌ TEST15: Bob should see 1 event_member_added on ev (got %)', ncnt; end if;
+
+    -- Crew-expansion fan-out on a FRESH event: exactly 1 per recipient.
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    insert into public.crew_members (crew_id,user_id,added_by) values (crew,carol,alice) on conflict do nothing;
+    insert into public.events (title,event_type,created_by) values ('Notif crew dinner','dinner',alice) returning id into nev;
+    perform public.assign_crew_to_event(crew, nev);
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_member_added' and event_id=nev;
+    if ncnt <> 1 then raise exception '❌ TEST15: Bob should have exactly 1 event_member_added from crew expansion (got %)', ncnt; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=carol and kind='event_member_added' and event_id=nev;
+    if ncnt <> 1 then raise exception '❌ TEST15: Carol should have exactly 1 event_member_added from crew expansion (got %)', ncnt; end if;
+
+    -- CARDINAL: Dave (the surprise target on ev/ev_crew) never receives a
+    -- notification TIED TO THOSE EVENTS. (He's an ordinary crew member
+    -- elsewhere — e.g. Alice's crew_added when she added him in TEST 9 — and
+    -- legitimately gets notified for non-surprise things; only event_id-scoped
+    -- rows for the surprise events themselves are the cardinal concern.)
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=dave and event_id in (ev, ev_crew);
+    if ncnt <> 0 then raise exception '❌ CARDINAL (TEST15): Dave must never be notified about a surprise event (got %)', ncnt; end if;
+
+    -- EVENT_CONFIRMED: idea -> planning (no notify) -> confirmed (notify
+    -- non-actor members once; actor self-skipped; re-advancing doesn't refire).
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    update public.events set status='planning' where id=nev;
+    update public.events set status='confirmed' where id=nev;
+    select count(*) into ncnt from public.notifications where recipient_id=alice and kind='event_confirmed' and event_id=nev;
+    if ncnt <> 0 then raise exception '❌ TEST15: Alice (the actor) should not self-notify on confirm (got %)', ncnt; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_confirmed' and event_id=nev;
+    if ncnt <> 1 then raise exception '❌ TEST15: Bob should have 1 event_confirmed (got %)', ncnt; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    update public.events set status='done' where id=nev;
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_confirmed' and event_id=nev;
+    if ncnt <> 1 then raise exception '❌ TEST15: event_confirmed must not re-fire on a later advance (got %)', ncnt; end if;
+
+    -- EVENT_CANCELLED.
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    update public.events set status='cancelled' where id=ev;
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_cancelled' and event_id=ev;
+    if ncnt <> 1 then raise exception '❌ TEST15: Bob should see 1 event_cancelled (got %)', ncnt; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=dave and event_id=ev;
+    if ncnt <> 0 then raise exception '❌ CARDINAL (TEST15): Dave must not be notified of cancellation either (got %)', ncnt; end if;
+
+    -- RLS isolation: Bob cannot read Alice's notifications, cannot INSERT for
+    -- someone else, and can only UPDATE read_at on his own rows.
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    select count(*) into ncnt from public.notifications where recipient_id=alice;
+    if ncnt <> 0 then raise exception '❌ TEST15: Bob must not be able to SELECT Alice''s notifications (got %)', ncnt; end if;
+
+    nok := false;
+    begin insert into public.notifications (recipient_id, actor_id, kind) values (alice, bob, 'friend_added');
+    exception when others then nok := true; end;
+    if not nok then raise exception '❌ TEST15: clients must not be able to INSERT notifications directly'; end if;
+
+    update public.notifications set read_at = now() where recipient_id=bob;
+    select count(*) into ncnt from public.notifications where recipient_id=bob and read_at is null;
+    if ncnt <> 0 then raise exception '❌ TEST15: read_at update should apply to all of Bob''s rows'; end if;
+
+    nok := false;
+    begin update public.notifications set kind='event_cancelled' where recipient_id=bob;
+    exception when others then nok := true; end;
+    if not nok then raise exception '❌ TEST15: a client must not be able to change kind via UPDATE'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);
