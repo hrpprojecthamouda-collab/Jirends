@@ -123,6 +123,7 @@
   "detailTabFiles": "Fichiers",
   "detailTabPolls": "Sondages",
   "detailTabHistory": "Historique",
+  "detailTabExpenses": "Masrouf",
 
   "historyEmpty": "Mazel famma chay tbeddil. El-tbdilat fi el-mnasba w el-sondages bech yibanou houni.",
   "historyFieldTitle": "3onwan",
@@ -257,5 +258,22 @@
   "createSurpriseClear": "Na77i",
 
   "commonRetry": "3awed",
-  "commonSomethingWrong": "Famma mochkla."
+  "commonSomethingWrong": "Famma mochkla.",
+
+  "expenseAdd": "Zid masrouf",
+  "expenseDescription": "Wasf",
+  "expenseAmount": "Qadd",
+  "expensePayer": "Khallasha",
+  "expenseSplitWith": "Maqsouma m3a",
+  "expenseEmpty": "Mazel famma chay masrouf. Ekteb chnowa khallast w m3a min maqsouma.",
+  "expenseSplitCount": "{count, plural, =1{maqsouma f wa7ed} other{maqsouma f {count}}}",
+  "expenseDelete": "Na77i el-masrouf",
+  "expenseDeleteConfirm": "Na77i el-masrouf hetha?",
+  "expenseNeedDescription": "Aatih wasf",
+  "expenseNeedAmount": "Ekteb qadd s7i7",
+  "expenseNeedPayer": "Ekhtar mine khallas",
+  "expenseNeedParticipants": "Ekhtar 3al aqal wa7ed bech tqasem m3ah",
+  "settleUpTitle": "El-7sabat",
+  "settleUpEmpty": "El-kol msa wa!",
+  "settleUpOwes": "{from} khasou {amount} l {to}"
 }

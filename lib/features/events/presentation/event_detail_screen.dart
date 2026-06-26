@@ -22,6 +22,7 @@ import '../data/event.dart';
 import '../data/event_member.dart';
 import '../data/event_phase.dart';
 import 'tabs/comments_tab.dart';
+import 'tabs/expenses_tab.dart';
 import 'tabs/files_tab.dart';
 import 'tabs/history_tab.dart';
 import 'tabs/items_tab.dart';
@@ -111,8 +112,9 @@ class _DetailScaffold extends ConsumerWidget {
   }
 
   // Index of the Files tab in the TabBar/TabBarView below. Tab order:
-  // 0 Overview, 1 Members, 2 Items, 3 Polls, 4 Comments, 5 Files, 6 History —
-  // keep this in sync when tabs are added or reordered.
+  // 0 Overview, 1 Members, 2 Items, 3 Polls, 4 Comments, 5 Files, 6 History,
+  // 7 Expenses — keep this in sync when tabs are added or reordered. Expenses
+  // was appended last so this index didn't need to shift.
   static const int _filesTabIndex = 5;
 
   @override
@@ -127,7 +129,7 @@ class _DetailScaffold extends ConsumerWidget {
         members.where((m) => m.userId == myId).firstOrNull;
 
     return DefaultTabController(
-      length: 7,
+      length: 8,
       child: Scaffold(
         // ── JIRA-ticket header row: back (auto) + Attachment + ⋮ + RSVP ──
         appBar: AppBar(
@@ -207,6 +209,7 @@ class _DetailScaffold extends ConsumerWidget {
                     Tab(text: t.detailTabComments),
                     Tab(text: t.detailTabFiles),
                     Tab(text: t.detailTabHistory),
+                    Tab(text: t.detailTabExpenses),
                   ],
                 ),
               ],
@@ -222,6 +225,7 @@ class _DetailScaffold extends ConsumerWidget {
             CommentsTab(eventId: event.id),
             FilesTab(eventId: event.id),
             HistoryTab(eventId: event.id),
+            ExpensesTab(eventId: event.id),
           ],
         ),
       ),

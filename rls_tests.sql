@@ -695,6 +695,84 @@ begin
     if ccnt <> 0 then raise exception '❌ CARDINAL (TEST16): Dave must not appear in ev''s member-conflicts at all'; end if;
   end;
 
+  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 17 — EXPENSES. Equal-split via add_expense (atomic, remainder lands
+  -- on the LAST participant so shares always sum exactly to the total);
+  -- non-member payer/participant rejected; a member cannot insert
+  -- expense_shares directly (must go through add_expense); only the creator
+  -- or an organizer may delete (cascades shares); event_settle_up produces
+  -- the minimum-transaction set and is empty once net-zero; the surprise
+  -- target reads nothing and gets zero settle-up rows. (Reuses `ev`, organizer
+  -- Alice, members Bob & Carol, target Dave; `ev_dinner` for the zero-expense
+  -- case.)
+  -- ════════════════════════════════════════════════════════════════════════
+  declare
+    xexp uuid; xsum bigint; xcnt int; xok boolean;
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+
+    -- Uneven 3-way split: 100 cents / 3 -> 33,33,34 (remainder to last).
+    xexp := public.add_expense(ev, alice, 'Snacks', 100, array[alice,bob,carol]);
+    select sum(share_cents) into xsum from public.expense_shares where expense_id=xexp;
+    if xsum <> 100 then raise exception '❌ TEST17: shares should sum to 100 (got %)', xsum; end if;
+    if (select share_cents from public.expense_shares where expense_id=xexp and user_id=carol) <> 34 then
+      raise exception '❌ TEST17: the remainder should land on the LAST participant'; end if;
+    if (select share_cents from public.expense_shares where expense_id=xexp and user_id=alice) <> 33 then
+      raise exception '❌ TEST17: the first participant should get the base share'; end if;
+
+    -- Non-member payer / participant rejected.
+    xok := false;
+    begin perform public.add_expense(ev, stranger, 'Bad payer', 50, array[alice,bob]);
+    exception when others then xok := true; end;
+    if not xok then raise exception '❌ TEST17: a non-member payer must be rejected'; end if;
+    xok := false;
+    begin perform public.add_expense(ev, alice, 'Bad participant', 50, array[alice,stranger]);
+    exception when others then xok := true; end;
+    if not xok then raise exception '❌ TEST17: a non-member participant must be rejected'; end if;
+
+    -- A member cannot insert expense_shares directly (bypassing add_expense).
+    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
+    xok := false;
+    begin insert into public.expense_shares (expense_id,event_id,user_id,share_cents) values (xexp,ev,bob,999);
+    exception when others then xok := true; end;
+    if not xok then raise exception '❌ TEST17: a non-creator must not insert expense_shares directly'; end if;
+
+    -- Delete permission: RLS denial is SILENT (0 rows affected, no
+    -- exception) — verify by row survival, not by expecting an error.
+    delete from public.expenses where id=xexp; -- Bob: not creator, not organizer
+    if not exists (select 1 from public.expenses where id=xexp) then
+      raise exception '❌ TEST17: a non-creator/non-organizer DELETE must affect 0 rows'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
+    delete from public.expenses where id=xexp; -- Alice: creator
+    if exists (select 1 from public.expenses where id=xexp) then
+      raise exception '❌ TEST17: the creator should be able to delete their own expense'; end if;
+    if exists (select 1 from public.expense_shares where expense_id=xexp) then
+      raise exception '❌ TEST17: deleting the expense should cascade its shares'; end if;
+
+    -- Settle-up: Alice pays 30 split 3 ways -> Bob and Carol each owe Alice 10.
+    xexp := public.add_expense(ev, alice, 'Dinner', 30, array[alice,bob,carol]);
+    select count(*) into xcnt from public.event_settle_up(ev);
+    if xcnt <> 2 then raise exception '❌ TEST17: expected exactly 2 transfers (got %)', xcnt; end if;
+    perform 1 from public.event_settle_up(ev) where to_user=alice and amount_cents=10 and from_user=bob;
+    if not found then raise exception '❌ TEST17: expected Bob -> Alice 10'; end if;
+    perform 1 from public.event_settle_up(ev) where to_user=alice and amount_cents=10 and from_user=carol;
+    if not found then raise exception '❌ TEST17: expected Carol -> Alice 10'; end if;
+
+    -- A net-zero event (no expenses) settles to zero rows.
+    select count(*) into xcnt from public.event_settle_up(ev_dinner);
+    if xcnt <> 0 then raise exception '❌ TEST17: an event with no expenses should settle to zero rows'; end if;
+
+    -- CARDINAL: Dave (surprise target on `ev`) reads nothing and gets zero
+    -- settle-up rows.
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into xcnt from public.expenses where event_id=ev;
+    if xcnt <> 0 then raise exception '❌ CARDINAL (TEST17): Dave must not read expenses'; end if;
+    select count(*) into xcnt from public.expense_shares where event_id=ev;
+    if xcnt <> 0 then raise exception '❌ CARDINAL (TEST17): Dave must not read expense_shares'; end if;
+    select count(*) into xcnt from public.event_settle_up(ev);
+    if xcnt <> 0 then raise exception '❌ CARDINAL (TEST17): Dave must get zero settle-up rows'; end if;
+  end;
+
   -- reset impersonation (cosmetic; the rollback below clears everything)
   perform set_config('role','postgres',true);
   perform set_config('request.jwt.claims','',true);

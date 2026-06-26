@@ -86,12 +86,17 @@ This is "Jira without the unnecessary parts." Resist rebuilding Jira.
 
 In scope (v1): events with a small fixed status set
 (idea → planning → confirmed → done/cancelled), members, assignable items,
-comments, reactions, attachments, simple RSVP, the surprise mechanic.
+comments, reactions, attachments, simple RSVP, the surprise mechanic, expenses
+with equal-split settle-up (Tricount-style: log who paid and who it's split
+between; the app computes a minimum-transaction settle-up — read-only, no
+"mark as paid").
 
 Out of scope (do not add without an explicit request): custom workflow engines,
 custom fields, dashboards/reporting, labels, saved filters, a web app.
-Date-polling and expense-splitting are explicitly **v2** — don't pull them
-forward.
+Date-polling is explicitly **v2** — don't pull it forward. Expense-splitting
+extensions (unequal/custom splits, multi-currency, marking transfers as
+settled) are also v2 — the v1 expenses feature is equal-split-only, read-only
+settle-up.
 
 ## Conventions
 

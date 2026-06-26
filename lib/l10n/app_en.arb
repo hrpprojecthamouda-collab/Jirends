@@ -139,6 +139,7 @@
   "detailTabFiles": "Files",
   "detailTabPolls": "Polls",
   "detailTabHistory": "History",
+  "detailTabExpenses": "Expenses",
 
   "historyEmpty": "No changes yet. Edits to the event and poll activity show up here.",
   "historyFieldTitle": "title",
@@ -288,5 +289,24 @@
   "createSurpriseClear": "Clear",
 
   "commonRetry": "Retry",
-  "commonSomethingWrong": "Something went wrong."
+  "commonSomethingWrong": "Something went wrong.",
+
+  "expenseAdd": "Add expense",
+  "expenseDescription": "Description",
+  "expenseAmount": "Amount",
+  "expensePayer": "Paid by",
+  "expenseSplitWith": "Split with",
+  "expenseEmpty": "No expenses yet. Log what you paid and who it's split between.",
+  "expenseSplitCount": "{count, plural, =1{split 1 way} other{split {count} ways}}",
+  "@expenseSplitCount": { "placeholders": { "count": { "type": "int" } } },
+  "expenseDelete": "Delete expense",
+  "expenseDeleteConfirm": "Delete this expense?",
+  "expenseNeedDescription": "Give it a description",
+  "expenseNeedAmount": "Enter a valid amount",
+  "expenseNeedPayer": "Choose who paid",
+  "expenseNeedParticipants": "Choose at least one person to split with",
+  "settleUpTitle": "Settle up",
+  "settleUpEmpty": "All settled up!",
+  "settleUpOwes": "{from} owes {to} {amount}",
+  "@settleUpOwes": { "placeholders": { "from": { "type": "String" }, "to": { "type": "String" }, "amount": { "type": "String" } } }
 }

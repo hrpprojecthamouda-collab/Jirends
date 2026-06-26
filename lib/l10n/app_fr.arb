@@ -122,6 +122,7 @@
   "detailTabFiles": "Fichiers",
   "detailTabPolls": "Sondages",
   "detailTabHistory": "Historique",
+  "detailTabExpenses": "Dépenses",
 
   "historyEmpty": "Aucun changement pour l’instant. Les modifications de l’événement et l’activité des sondages apparaissent ici.",
   "historyFieldTitle": "titre",
@@ -256,5 +257,22 @@
   "createSurpriseClear": "Effacer",
 
   "commonRetry": "Réessayer",
-  "commonSomethingWrong": "Une erreur s’est produite."
+  "commonSomethingWrong": "Une erreur s’est produite.",
+
+  "expenseAdd": "Ajouter une dépense",
+  "expenseDescription": "Description",
+  "expenseAmount": "Montant",
+  "expensePayer": "Payé par",
+  "expenseSplitWith": "Partagé avec",
+  "expenseEmpty": "Aucune dépense pour l’instant. Notez ce que vous avez payé et avec qui c’est partagé.",
+  "expenseSplitCount": "{count, plural, =1{partagé en 1} other{partagé en {count}}}",
+  "expenseDelete": "Supprimer la dépense",
+  "expenseDeleteConfirm": "Supprimer cette dépense ?",
+  "expenseNeedDescription": "Ajoutez une description",
+  "expenseNeedAmount": "Saisissez un montant valide",
+  "expenseNeedPayer": "Choisissez qui a payé",
+  "expenseNeedParticipants": "Choisissez au moins une personne pour le partage",
+  "settleUpTitle": "Comptes",
+  "settleUpEmpty": "Tout est réglé !",
+  "settleUpOwes": "{from} doit {amount} à {to}"
 }

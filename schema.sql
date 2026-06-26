@@ -120,6 +120,35 @@ create table if not exists public.event_items (
 create index if not exists event_items_event_idx on public.event_items (event_id);
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- expenses + expense_shares — Tricount-style equal-split expense tracking.
+-- Amounts are INTEGER CENTS (bigint), never float, to avoid rounding error on
+-- money. No currency field (v1: plain numbers). No edit path — delete +
+-- re-add is the v1 correction flow. event_settle_up() (below, with the other
+-- helper functions) computes a read-only, minimum-transaction settle-up live
+-- from this ledger — there is no "mark as paid".
+-- ────────────────────────────────────────────────────────────────────────────
+create table if not exists public.expenses (
+  id           uuid primary key default gen_random_uuid(),
+  event_id     uuid not null references public.events(id) on delete cascade,
+  payer_id     uuid not null references public.profiles(id) on delete cascade,
+  description  text not null check (char_length(description) between 1 and 140),
+  amount_cents bigint not null check (amount_cents > 0),
+  created_by   uuid not null references public.profiles(id) on delete cascade,
+  created_at   timestamptz not null default now()
+);
+create index if not exists expenses_event_idx on public.expenses (event_id);
+
+create table if not exists public.expense_shares (
+  expense_id  uuid not null references public.expenses(id) on delete cascade,
+  event_id    uuid not null references public.events(id) on delete cascade, -- carried for RLS, kept in sync below
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  share_cents bigint not null check (share_cents >= 0),
+  primary key (expense_id, user_id)
+);
+create index if not exists expense_shares_event_idx on public.expense_shares (event_id);
+create index if not exists expense_shares_user_idx  on public.expense_shares (user_id);
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- comments — top-level comments on an event, plus REPLIES that form a
 -- "discussion". A reply sets parent_id to a TOP-LEVEL comment (two-level only;
 -- enforced by trg_enforce_comment_two_levels). thread_title names the
@@ -767,6 +796,222 @@ create policy event_items_delete on public.event_items
   for delete to authenticated
   using (public.is_event_organizer(event_id) or created_by = auth.uid());
 
+-- ── expenses / expense_shares ────────────────────────────────────────────────
+-- Keep expense_shares.event_id consistent with its expense (same defensive
+-- shape as sync_poll_child_event in polls.sql) — the carried-for-RLS column
+-- can't be spoofed to another event.
+create or replace function public.sync_expense_share_event()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  v_event uuid;
+begin
+  select event_id into v_event from public.expenses where id = new.expense_id;
+  if v_event is null then
+    raise exception 'expense % does not exist', new.expense_id using errcode = 'foreign_key_violation';
+  end if;
+  new.event_id := v_event;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_expense_share_event on public.expense_shares;
+create trigger trg_sync_expense_share_event
+  before insert or update of expense_id on public.expense_shares
+  for each row execute function public.sync_expense_share_event();
+
+-- Guard: payer_id must be an event member at insert time (mirrors the
+-- surprise-guard / reject_nonorganizer_typed_poll defensive trigger shape).
+create or replace function public.reject_nonmember_payer()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if not exists (
+    select 1 from public.event_members where event_id = new.event_id and user_id = new.payer_id
+  ) then
+    raise exception 'payer must be a member of the event' using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_reject_nonmember_payer on public.expenses;
+create trigger trg_reject_nonmember_payer
+  before insert or update of payer_id, event_id on public.expenses
+  for each row execute function public.reject_nonmember_payer();
+
+-- Guard: every expense_shares.user_id must be an event member. AFTER, not
+-- BEFORE: event_id is only finalised by trg_sync_expense_share_event (a
+-- BEFORE trigger on this same table); AFTER guarantees it has already run.
+create or replace function public.reject_nonmember_share()
+returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if not exists (
+    select 1 from public.event_members where event_id = new.event_id and user_id = new.user_id
+  ) then
+    raise exception 'a share must belong to an event member' using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_reject_nonmember_share on public.expense_shares;
+create trigger trg_reject_nonmember_share
+  after insert or update of user_id, event_id on public.expense_shares
+  for each row execute function public.reject_nonmember_share();
+
+alter table public.expenses       enable row level security;
+alter table public.expense_shares enable row level security;
+
+drop policy if exists expenses_select on public.expenses;
+create policy expenses_select on public.expenses
+  for select to authenticated using (public.is_event_member(event_id));
+
+-- add_expense() (below) inserts through THIS policy as the authenticated
+-- caller — it exists for atomicity/server-side split math, not to bypass RLS.
+drop policy if exists expenses_insert on public.expenses;
+create policy expenses_insert on public.expenses
+  for insert to authenticated
+  with check (public.is_event_member(event_id) and created_by = auth.uid());
+
+drop policy if exists expenses_delete on public.expenses;
+create policy expenses_delete on public.expenses
+  for delete to authenticated
+  using (created_by = auth.uid() or public.is_event_organizer(event_id));
+-- No UPDATE policy: v1 has no edit path (delete + re-add).
+
+drop policy if exists expense_shares_select on public.expense_shares;
+create policy expense_shares_select on public.expense_shares
+  for select to authenticated using (public.is_event_member(event_id));
+
+-- Members may insert shares ONLY for an expense they just created (so
+-- add_expense's two inserts both pass RLS as the authenticated caller).
+-- There's no UPDATE/DELETE policy (shares are immutable; deleting the expense
+-- cascades them).
+drop policy if exists expense_shares_insert on public.expense_shares;
+create policy expense_shares_insert on public.expense_shares
+  for insert to authenticated
+  with check (
+    public.is_event_member(event_id)
+    and exists (select 1 from public.expenses e where e.id = expense_id and e.created_by = auth.uid())
+  );
+
+-- Atomic expense + equal-split shares. SECURITY INVOKER: both inserts run as
+-- the caller, so the policies above fully apply — this function exists for
+-- atomicity (one failure can't leave a half-written expense) and to compute
+-- the per-share split server-side, not to bypass RLS. Remainder from an
+-- uneven split lands on the LAST participant so shares always sum exactly to
+-- amount_cents.
+create or replace function public.add_expense(
+  p_event uuid, p_payer uuid, p_description text, p_amount_cents bigint,
+  p_participant_ids uuid[])
+returns uuid
+language plpgsql security invoker set search_path = public, pg_temp
+as $$
+declare
+  v_expense uuid;
+  v_n int;
+  v_base bigint;
+  v_remainder bigint;
+  v_uid uuid;
+  v_i int := 0;
+begin
+  if p_amount_cents is null or p_amount_cents <= 0 then
+    raise exception 'amount must be positive' using errcode = 'check_violation';
+  end if;
+  v_n := coalesce(array_length(p_participant_ids, 1), 0);
+  if v_n = 0 then
+    raise exception 'an expense needs at least one participant' using errcode = 'check_violation';
+  end if;
+
+  insert into public.expenses (event_id, payer_id, description, amount_cents, created_by)
+  values (p_event, p_payer, btrim(p_description), p_amount_cents, auth.uid())
+  returning id into v_expense;
+
+  v_base := p_amount_cents / v_n;
+  v_remainder := p_amount_cents - (v_base * v_n);
+
+  foreach v_uid in array p_participant_ids loop
+    v_i := v_i + 1;
+    insert into public.expense_shares (expense_id, event_id, user_id, share_cents)
+    values (
+      v_expense, p_event, v_uid,
+      v_base + case when v_i = v_n then v_remainder else 0 end
+    );
+  end loop;
+
+  return v_expense;
+end;
+$$;
+revoke all on function public.add_expense(uuid, uuid, text, bigint, uuid[]) from public;
+grant execute on function public.add_expense(uuid, uuid, text, bigint, uuid[]) to authenticated;
+
+-- Minimum-transaction settle-up: net every member's balance (paid - owed),
+-- then greedily pair the largest creditor with the largest debtor until both
+-- (or one) reach zero, repeating until everyone is settled. O(member count)
+-- — trivial even for large events. Gated by is_event_member like
+-- event_member_conflicts; returns only transfers among this event's members,
+-- nothing beyond what's already derivable from expenses the caller can read.
+-- Read-only: there is no "mark as paid" — this is always recomputed live.
+create or replace function public.event_settle_up(p_event uuid)
+returns table(from_user uuid, to_user uuid, amount_cents bigint)
+language plpgsql stable security definer set search_path = public, pg_temp
+as $$
+declare
+  r record;
+  v_balances uuid[] := array[]::uuid[];
+  v_amounts  bigint[] := array[]::bigint[];
+  v_i int;
+  v_max_credit bigint; v_max_credit_idx int;
+  v_max_debit  bigint; v_max_debit_idx  int;
+  v_transfer   bigint;
+begin
+  if not public.is_event_member(p_event) then
+    return;
+  end if;
+
+  for r in
+    select m.user_id,
+      coalesce((select sum(e.amount_cents) from public.expenses e where e.event_id = p_event and e.payer_id = m.user_id), 0)
+      - coalesce((select sum(s.share_cents) from public.expense_shares s where s.event_id = p_event and s.user_id = m.user_id), 0)
+        as balance
+    from public.event_members m
+    where m.event_id = p_event
+  loop
+    if r.balance <> 0 then
+      v_balances := v_balances || r.user_id;
+      v_amounts  := v_amounts  || r.balance;
+    end if;
+  end loop;
+
+  loop
+    v_max_credit := 0; v_max_credit_idx := null;
+    v_max_debit  := 0; v_max_debit_idx  := null;
+    for v_i in 1 .. coalesce(array_length(v_amounts,1),0) loop
+      if v_amounts[v_i] > v_max_credit then v_max_credit := v_amounts[v_i]; v_max_credit_idx := v_i; end if;
+      if v_amounts[v_i] < -v_max_debit then v_max_debit := -v_amounts[v_i]; v_max_debit_idx := v_i; end if;
+    end loop;
+    exit when v_max_credit_idx is null or v_max_debit_idx is null or v_max_credit = 0 or v_max_debit = 0;
+
+    v_transfer := least(v_max_credit, v_max_debit);
+    from_user := v_balances[v_max_debit_idx];
+    to_user   := v_balances[v_max_credit_idx];
+    amount_cents := v_transfer;
+    return next;
+
+    v_amounts[v_max_credit_idx] := v_amounts[v_max_credit_idx] - v_transfer;
+    v_amounts[v_max_debit_idx]  := v_amounts[v_max_debit_idx]  + v_transfer;
+  end loop;
+  return;
+end;
+$$;
+revoke all on function public.event_settle_up(uuid) from public;
+grant execute on function public.event_settle_up(uuid) to authenticated;
+
 -- ── comments ────────────────────────────────────────────────────────────────
 drop policy if exists comments_select on public.comments;
 create policy comments_select on public.comments
@@ -872,6 +1117,8 @@ begin
     begin alter publication supabase_realtime add table public.events;        exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.event_members; exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.event_items;   exception when duplicate_object then null; end;
+    begin alter publication supabase_realtime add table public.expenses;       exception when duplicate_object then null; end;
+    begin alter publication supabase_realtime add table public.expense_shares; exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.comments;      exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.reactions;     exception when duplicate_object then null; end;
     begin alter publication supabase_realtime add table public.attachments;   exception when duplicate_object then null; end;
