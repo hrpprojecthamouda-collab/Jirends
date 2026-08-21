@@ -299,6 +299,14 @@ returns trigger
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
+  -- add_friend_by_handle writes BOTH directions, so this fires twice. The
+  -- mirror row (owner = the person who was added) would notify the initiator
+  -- that their own target "added them", which they plainly know. Only the row
+  -- the caller owns produces a notification.
+  -- Applied live as `friend_added_notify_only_the_added_side`.
+  if new.owner_id is distinct from auth.uid() then
+    return new;
+  end if;
   perform public.notify(new.friend_id, new.owner_id, 'friend_added');
   return new;
 end;
@@ -372,15 +380,21 @@ begin
 
     if v_new_terminal and new.status = 'cancelled' then
       v_kind := 'event_cancelled';
-    elsif v_new_pos is not null and v_new_pos > 2
-          and not exists (
-            select 1 from public.notifications
-            where event_id = new.id and kind = 'event_confirmed'
-          ) then
+    elsif v_new_pos is not null and v_new_pos > 2 then
       v_kind := 'event_confirmed';
     end if;
 
     if v_kind is not null then
+      -- SUPERSEDE rather than suppress. The old rule was "don't re-notify if a
+      -- confirmed notification already exists", which meant a later cancel sat
+      -- in the bell BESIDE the earlier confirm and the reader had to work out
+      -- which won. Deleting the event's previous status notifications first
+      -- leaves exactly one, always the current state.
+      -- Applied live as `event_status_notification_supersedes_previous`.
+      delete from public.notifications
+       where event_id = new.id
+         and kind in ('event_confirmed', 'event_cancelled');
+
       for v_member in
         select user_id from public.event_members where event_id = new.id
       loop

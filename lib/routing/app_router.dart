@@ -4,9 +4,13 @@
 ///   session, no handle    -> /onboarding
 ///   session, has handle   -> the app shell (nav rail + branches)
 ///
-/// Signed-in users land in a StatefulShellRoute: a left nav rail with four
+/// Signed-in users land in a StatefulShellRoute: a bottom nav bar with four
 /// branches (Home, Events, Friends, Groups), each keeping its own nav stack,
-/// plus a top-level /settings overlay reached from the rail's gear.
+/// plus top-level /profile and /settings overlays.
+///
+/// Event detail (/events/:id and below) is deliberately pushed on the ROOT
+/// navigator so it renders above the shell — an open event gets the full
+/// screen with no bottom nav bar.
 ///
 /// Visibility of *events* is NOT decided here — that is the database's job
 /// (the cardinal rule). This guard only gates auth and the one-time handle
@@ -18,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/supabase/supabase_providers.dart';
+import '../features/auth/data/profile.dart';
 import '../features/auth/data/profile_repository.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
@@ -70,6 +75,66 @@ class AppRoutes {
 
 final _rootKey = GlobalKey<NavigatorState>();
 
+/// Where the user belongs, given the session and what we currently know about
+/// their profile. Pure and separate from GoRouter so it can be tested directly
+/// — the states that matter here are transient and near-impossible to catch by
+/// hand in a running app.
+///
+/// The subtle case is [profile] being AsyncLoading *with a stale value*.
+/// Riverpod keeps the previous value across a re-fetch, so `hasValue` stays
+/// true while myProfileProvider re-runs for the new session. Trusting it meant
+/// that at sign-in the guard read the SIGNED-OUT profile (null), concluded
+/// "no handle" and flashed the onboarding screen at returning users until the
+/// real profile arrived. So the question is not "do we have a profile" but
+/// "do we have THIS user's profile".
+///
+/// This gates auth and the one-time handle step only. Event visibility is the
+/// database's job (the cardinal rule) and is never decided here.
+@visibleForTesting
+String? redirectFor({
+  required String? userId,
+  required AsyncValue<Profile?> profile,
+  required String location,
+}) {
+  final loggingIn =
+      location == AppRoutes.signIn || location == AppRoutes.signUp;
+
+  // 1. No session -> must authenticate.
+  if (userId == null) {
+    return loggingIn ? null : AppRoutes.signIn;
+  }
+
+  // 2. Signed in. Is the profile we are holding actually this user's?
+  final loaded = profile.value;
+  final knowsThisUser = loaded != null && loaded.id == userId;
+
+  if (!knowsThisUser) {
+    // Still fetching (cold start, or the swap right after signing in): we
+    // cannot tell onboarding from home yet, so wait on the splash rather than
+    // guess. Guessing is what caused the flash.
+    if (profile.isLoading) {
+      return location == AppRoutes.splash ? null : AppRoutes.splash;
+    }
+    // Settled with no profile for this user: genuinely new, so onboard them.
+    // (An errored fetch lands here too — onboarding is recoverable, whereas
+    // holding on the splash forever is not.)
+    return location == AppRoutes.onboarding ? null : AppRoutes.onboarding;
+  }
+
+  final onOnboarding = location == AppRoutes.onboarding;
+
+  // 3. Signed in, no handle yet -> onboarding.
+  if (!loaded.hasHandle) {
+    return onOnboarding ? null : AppRoutes.onboarding;
+  }
+
+  // 4. Fully set up -> keep them out of auth/onboarding/splash pages.
+  if (loggingIn || onOnboarding || location == AppRoutes.splash) {
+    return AppRoutes.home;
+  }
+  return null;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   // Rebuild routing decisions whenever auth or the profile changes.
   final refresh = _RouterRefresh(ref);
@@ -79,37 +144,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootKey,
     initialLocation: AppRoutes.home,
     refreshListenable: refresh,
-    redirect: (context, state) {
-      final session = ref.read(currentSessionProvider);
-      final loc = state.matchedLocation;
-      final loggingIn = loc == AppRoutes.signIn || loc == AppRoutes.signUp;
-
-      // 1. No session -> must authenticate.
-      if (session == null) {
-        return loggingIn ? null : AppRoutes.signIn;
-      }
-
-      // 2. Signed in: do we know the profile yet?
-      final profileAsync = ref.read(myProfileProvider);
-      // While the profile is loading on cold start, hold on the splash.
-      if (profileAsync.isLoading && !profileAsync.hasValue) {
-        return loc == AppRoutes.splash ? null : AppRoutes.splash;
-      }
-
-      final hasHandle = profileAsync.value?.hasHandle ?? false;
-      final onOnboarding = loc == AppRoutes.onboarding;
-
-      // 3. Signed in, no handle -> onboarding.
-      if (!hasHandle) {
-        return onOnboarding ? null : AppRoutes.onboarding;
-      }
-
-      // 4. Fully set up -> keep them out of auth/onboarding/splash pages.
-      if (loggingIn || onOnboarding || loc == AppRoutes.splash) {
-        return AppRoutes.home;
-      }
-      return null;
-    },
+    redirect: (context, state) => redirectFor(
+      userId: ref.read(currentSessionProvider)?.user.id,
+      profile: ref.read(myProfileProvider),
+      location: state.matchedLocation,
+    ),
     routes: [
       // ── Auth / onboarding / splash (outside the shell) ──────────────────
       GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
@@ -143,13 +182,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                 GoRoute(
                     path: 'new',
                     builder: (_, _) => const CreateEventScreen()),
+                // Opening an event takes over the whole screen: pushing it on
+                // the ROOT navigator puts it above the shell, so the bottom
+                // nav bar is absent (not merely hidden) while you're inside
+                // an event. Back still returns to the Events list.
                 GoRoute(
                   path: ':id',
+                  parentNavigatorKey: _rootKey,
                   builder: (context, state) =>
                       EventDetailScreen(eventId: state.pathParameters['id']!),
                   routes: [
                     GoRoute(
                       path: 'discussion/:rootId',
+                      parentNavigatorKey: _rootKey,
                       builder: (context, state) => DiscussionScreen(
                         eventId: state.pathParameters['id']!,
                         rootId: state.pathParameters['rootId']!,

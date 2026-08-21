@@ -14,10 +14,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/profile.dart';
-import '../../friends/application/friend_list_controller.dart';
 import '../../groups/presentation/member_picker.dart';
 import '../application/event_list_controller.dart';
 import '../data/event.dart';
+import '../../friends/data/friend_repository.dart';
 
 class CreateEventScreen extends ConsumerStatefulWidget {
   const CreateEventScreen({super.key});
@@ -117,7 +117,10 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
   Future<void> _pickSurprise() async {
     final t = AppLocalizations.of(context);
-    final friends = ref.read(friendListProvider).value ?? const [];
+    final friends =
+        await loadForPicker(
+            context, ref.read(friendRepositoryProvider).fetchFriends());
+    if (friends == null || !mounted) return;
     final picked = await showMemberPicker(
       context,
       candidates: friends,
@@ -262,7 +265,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     padding: const EdgeInsets.only(top: 6),
                     child: Row(
                       children: [
-                        const Icon(Icons.visibility_off_outlined,
+                        Icon(Icons.visibility_off_outlined,
                             size: 16, color: AppColors.yellow),
                         const SizedBox(width: 6),
                         Expanded(

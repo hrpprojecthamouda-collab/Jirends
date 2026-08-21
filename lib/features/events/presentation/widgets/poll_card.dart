@@ -13,6 +13,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../application/poll_controller.dart';
 import '../../data/poll.dart';
 import '../../data/poll_repository.dart';
+import '../../data/poll_vote.dart';
+import 'option_voters_dialog.dart';
 import 'poll_wheel.dart';
 
 class PollCard extends ConsumerWidget {
@@ -37,31 +39,41 @@ class PollCard extends ConsumerWidget {
     final canDelete = isCreator || isEventOrganizer;
     final actions = ref.read(pollActionsControllerProvider.notifier);
 
-    return Card(
+    final open = poll.isOpen;
+
+    // No outline; open vs closed is carried purely by shade. An OPEN poll uses
+    // the very same `surface` as the Description/Attendees cards on the event
+    // page, so a poll card reads as the same kind of object wherever you meet
+    // it. A closed one drops to `surfaceHi` — still a tone of the same family,
+    // but visibly duller, so settled polls recede without needing a label.
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: open ? AppColors.surface : AppColors.surfaceHi,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: question + chips. Special kinds (day/time/place) render
+            // Header: question + tags. Special kinds (day/time/place) render
             // the viewer-localized auto-title, not the stored question.
             Text(_title(t, poll),
                 style: Theme.of(context)
                     .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Wrap(spacing: 6, runSpacing: 4, children: [
-              _chip(context, _kindLabel(t, poll.kind), AppColors.blue),
-              _chip(
-                  context,
-                  poll.mode == PollMode.weightedRandom
-                      ? t.pollModeWheel
-                      : t.pollModeMajority,
-                  AppColors.violet),
-              _chip(context, poll.isOpen ? t.pollOpen : t.pollClosed,
-                  poll.isOpen ? AppColors.teal : AppColors.inkMuted),
-            ]),
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            if (_tags(poll).isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                _tags(poll).join('   '),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.inkMuted,
+                      fontWeight: FontWeight.w400,
+                    ),
+              ),
+            ],
             // Special kinds: the winner is written onto the event at close.
             if (poll.kind != PollKind.general) ...[
               const SizedBox(height: 6),
@@ -79,12 +91,13 @@ class PollCard extends ConsumerWidget {
                 label: o.label,
                 votes: view.votesFor(o.id),
                 total: view.totalVotes,
-                selected: view.myOptionId == o.id,
+                selected: view.myOptionIds.contains(o.id),
                 isWinner: poll.winningOptionId == o.id,
                 canVote: poll.isOpen,
                 onTap: poll.isOpen
                     ? () => actions.vote(poll.id, poll.eventId, o.id)
                     : null,
+                voters: view.votersFor(o.id),
               ),
 
             const SizedBox(height: 8),
@@ -119,7 +132,7 @@ class PollCard extends ConsumerWidget {
             // an infinite width" when the card is measured for intrinsic width.
             // Plain tappable chips have no _RenderInputPadding and size cleanly.
             if (canDelete) ...[
-              const Divider(height: 20, color: AppColors.outline),
+              Divider(height: 20, color: AppColors.outline),
               Row(
                 mainAxisAlignment: isCreator
                     ? MainAxisAlignment.spaceBetween
@@ -216,12 +229,23 @@ class PollCard extends ConsumerWidget {
     );
   }
 
-  String _kindLabel(AppLocalizations t, PollKind k) => switch (k) {
-        PollKind.general => t.pollKindGeneral,
-        PollKind.date => t.pollKindDate,
-        PollKind.time => t.pollKindTime,
-        PollKind.place => t.pollKindPlace,
-      };
+  /// Hashtags for kind and win-condition, e.g. `#time  #majority_wins`.
+  ///
+  /// Deliberately literal ASCII rather than localized strings: a hashtag is a
+  /// token, not prose, and translating it per locale would make the same poll
+  /// read differently to different members. A general poll contributes no kind
+  /// tag at all — there is nothing to say about it.
+  List<String> _tags(Poll poll) => [
+        ?switch (poll.kind) {
+          PollKind.general => null,
+          PollKind.date => '#day',
+          PollKind.time => '#time',
+          PollKind.place => '#place',
+        },
+        poll.mode == PollMode.weightedRandom
+            ? '#weighted_wheel'
+            : '#majority_wins',
+      ];
 
   /// Special kinds show a fixed, viewer-localized title; general polls show
   /// their stored question.
@@ -232,19 +256,6 @@ class PollCard extends ConsumerWidget {
         PollKind.place => t.pollTitlePlace,
       };
 
-  Widget _chip(BuildContext context, String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(
-          // ignore: deprecated_member_use
-          color: color.withOpacity(0.16),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(text,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: color, fontWeight: FontWeight.w600)),
-      );
 }
 
 /// A small tappable chip used for the creator's poll actions. Plain
@@ -308,6 +319,7 @@ class _OptionRow extends StatelessWidget {
     required this.isWinner,
     required this.canVote,
     required this.onTap,
+    required this.voters,
   });
   final String label;
   final int votes;
@@ -316,6 +328,9 @@ class _OptionRow extends StatelessWidget {
   final bool isWinner;
   final bool canVote;
   final VoidCallback? onTap;
+
+  /// Everyone who backed this option — shown on press-and-hold.
+  final List<PollVote> voters;
 
   @override
   Widget build(BuildContext context) {
@@ -333,13 +348,34 @@ class _OptionRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: onTap,
+        // Press and hold to see who backed this option. The row's own centre
+        // is passed through so the panel appears to grow out of it.
+        onLongPress: () {
+          final box = context.findRenderObject() as RenderBox?;
+          final origin = box == null
+              ? MediaQuery.of(context).size.center(Offset.zero)
+              : box.localToGlobal(box.size.center(Offset.zero));
+          showOptionVotersDialog(
+            context,
+            origin: origin,
+            optionLabel: label,
+            voters: voters,
+          );
+        },
         borderRadius: BorderRadius.circular(10),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
+            // The page/panel background tone, so an option reads as a well
+            // cut into the card rather than a tile stacked on it.
+            color: AppColors.bg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: selected ? AppColors.primary : AppColors.outline),
+            // Outlined ONLY when this is the option you voted for — the
+            // outline means "your vote", nothing else, so it can't be
+            // confused with a border everything happens to have.
+            border: selected
+                ? Border.all(color: AppColors.primary, width: 2)
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -348,7 +384,7 @@ class _OptionRow extends StatelessWidget {
               Row(
                 children: [
                   if (selected)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(right: 6),
                       child: Icon(Icons.check_circle,
                           size: 16, color: AppColors.primary),

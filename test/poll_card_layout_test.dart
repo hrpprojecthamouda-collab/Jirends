@@ -37,8 +37,35 @@ PollView _view({bool closed = false, PollMode mode = PollMode.majority}) {
     poll: poll,
     options: options,
     tallies: const {'o1': 2, 'o2': 1},
-    myOptionId: 'o1',
-    closedVotes: const [],
+    myOptionIds: const {'o1'},
+    // 3 votes from 2 people — multi-select means votes != voters.
+    voterCount: 2,
+    votes: const [],
+  );
+}
+
+/// A poll where the caller has backed BOTH options — the multi-select case.
+PollView _multiVoted() {
+  const poll = Poll(
+    id: 'p1',
+    eventId: 'e1',
+    question: 'Pizza or sushi?',
+    kind: PollKind.general,
+    mode: PollMode.majority,
+    status: PollStatus.open,
+    createdBy: 'me',
+  );
+  const options = [
+    PollOption(id: 'o1', pollId: 'p1', label: 'Pizza', position: 1),
+    PollOption(id: 'o2', pollId: 'p1', label: 'Sushi', position: 2),
+  ];
+  return PollView(
+    poll: poll,
+    options: options,
+    tallies: const {'o1': 1, 'o2': 1},
+    myOptionIds: const {'o1', 'o2'},
+    voterCount: 1, // one person, two votes
+    votes: const [],
   );
 }
 
@@ -197,5 +224,55 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(tester.takeException(), isNull);
+  });
+  group('multi-select', _multiSelectTests);
+}
+
+// ── Multi-select voting ────────────────────────────────────────────────────
+// A member may back several options in one poll (see polls_multivote.sql), so
+// PollView carries a SET of the caller's options rather than a single id, and
+// the voter count is tracked separately from the vote total.
+void _multiSelectTests() {
+  testWidgets('every option the caller backed renders as selected',
+      (tester) async {
+    final view = _multiVoted();
+    await tester.pumpWidget(_host(PollCard(view: view)));
+    await tester.pumpAndSettle();
+
+    // Both options are the caller's — both show the "your vote" check.
+    expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
+  });
+
+  test('votes and voters are separate counts under multi-select', () {
+    final view = _multiVoted();
+    expect(view.totalVotes, 2, reason: 'two votes were cast');
+    expect(view.voterCount, 1, reason: 'but by a single person');
+  });
+
+  testWidgets('a poll still renders when the voter count is unknown',
+      (tester) async {
+    // voterCount is null when poll_voter_counts_for_event is unavailable (a
+    // database that predates polls_multivote.sql). The poll must still draw:
+    // losing one figure must never cost the whole view.
+    final view = PollView(
+      poll: _multiVoted().poll,
+      options: _multiVoted().options,
+      tallies: const {'o1': 1, 'o2': 1},
+      myOptionIds: const {'o1'},
+      voterCount: null,
+      votes: const [],
+    );
+    await tester.pumpWidget(_host(PollCard(view: view)));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Pizza'), findsOneWidget);
+    expect(find.text('Sushi'), findsOneWidget);
+  });
+
+  test('an empty option set means the caller has not voted', () {
+    final view = _multiVoted();
+    expect(view.myOptionIds.contains('o1'), isTrue);
+    expect(const <String>{}.contains('o1'), isFalse);
   });
 }

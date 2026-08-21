@@ -30,6 +30,21 @@ class CrewRepository {
     });
   }
 
+  /// One-shot list of the crews the caller can see, alphabetised.
+  ///
+  /// Pickers want a snapshot, not a subscription — see loadForPicker. RLS
+  /// scopes the rows, so there is no owner filter here (crews are shared).
+  Future<List<Crew>> fetchCrews() async {
+    if (_client.auth.currentUser?.id == null) return const [];
+    try {
+      final rows = await _client.from('crews').select();
+      return rows.map(Crew.fromJson).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
+
   Future<Crew> createCrew(String name) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw const AuthFailure('You are not signed in.');

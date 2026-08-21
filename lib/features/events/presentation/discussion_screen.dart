@@ -16,6 +16,7 @@ import '../application/comment_controller.dart';
 import '../data/comment.dart';
 import '../data/reaction.dart';
 import 'widgets/reaction_bar.dart';
+import 'widgets/reaction_users_sheet.dart';
 import 'widgets/thread_title_dialog.dart';
 
 class DiscussionScreen extends ConsumerStatefulWidget {
@@ -134,7 +135,7 @@ class _DiscussionScreenState extends ConsumerState<DiscussionScreen> {
                         padding: const EdgeInsets.all(24),
                         child: Text(t.discussionEmpty,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppColors.inkMuted)),
+                            style: TextStyle(color: AppColors.inkMuted)),
                       ),
                     )
                   : ListView.builder(
@@ -241,7 +242,7 @@ class _MessageCard extends ConsumerWidget {
                 if (isMine)
                   InkWell(
                     onTap: () => _confirmDelete(context, ref),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.only(left: 8),
                       child:
                           Icon(Icons.close, size: 16, color: AppColors.inkMuted),
@@ -255,9 +256,14 @@ class _MessageCard extends ConsumerWidget {
             ReactionBar(
               reactions: reactions,
               myUserId: myId,
-              onToggle: (emoji) => ref
+              onSelect: (emoji) => ref
                   .read(commentActionsControllerProvider.notifier)
-                  .toggleReaction(eventId, commentId: comment.id, emoji: emoji),
+                  .setMyReaction(eventId, commentId: comment.id, emoji: emoji),
+              onShowUsers: () => showReactionUsersSheet(
+                context,
+                eventId: eventId,
+                commentId: comment.id,
+              ),
             ),
           ],
         ),

@@ -19,6 +19,13 @@ final eventListProvider = StreamProvider<List<Event>>((ref) {
   return ref.watch(eventRepositoryProvider).watchMyEvents();
 });
 
+/// Attendee count per event id, for the list cards. Live, so a card's count
+/// follows people joining or leaving without a refresh.
+final eventMemberCountsProvider = StreamProvider<Map<String, int>>((ref) {
+  ref.watch(currentSessionProvider);
+  return ref.watch(eventRepositoryProvider).watchMemberCounts();
+});
+
 /// A single event by id, for the detail screen. Returns null when the event
 /// doesn't exist or isn't visible (RLS) — the UI shows the same "not found"
 /// either way, by design.

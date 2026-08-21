@@ -14,10 +14,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/profile.dart';
-import '../../friends/application/friend_list_controller.dart';
 import '../application/crew_list_controller.dart';
 import 'group_dialogs.dart';
 import 'member_picker.dart';
+import '../../profile/presentation/user_avatar.dart';
+import '../../friends/data/friend_repository.dart';
 
 class CrewDetailScreen extends ConsumerWidget {
   const CrewDetailScreen({super.key, required this.crewId});
@@ -50,7 +51,7 @@ class CrewDetailScreen extends ConsumerWidget {
           if (isOwner)
             IconButton(
               tooltip: t.crewDelete,
-              icon: const Icon(Icons.delete_outline, color: AppColors.coral),
+              icon: Icon(Icons.delete_outline, color: AppColors.coral),
               onPressed: () async {
                 final ok = await showConfirmDialog(
                   context,
@@ -88,7 +89,7 @@ class CrewDetailScreen extends ConsumerWidget {
                     size: 16, color: AppColors.inkMuted),
                 const SizedBox(width: 8),
                 Text(isOwner ? t.crewYouOwn : t.crewYouAreMember,
-                    style: const TextStyle(color: AppColors.inkMuted)),
+                    style: TextStyle(color: AppColors.inkMuted)),
               ],
             ),
           ),
@@ -106,7 +107,7 @@ class CrewDetailScreen extends ConsumerWidget {
                         title: Text(p.handle ?? '…'),
                         trailing: isOwner
                             ? IconButton(
-                                icon: const Icon(Icons.person_remove_outlined,
+                                icon: Icon(Icons.person_remove_outlined,
                                     color: AppColors.inkMuted),
                                 onPressed: () => ref
                                     .read(crewActionsControllerProvider.notifier)
@@ -127,7 +128,10 @@ class CrewDetailScreen extends ConsumerWidget {
   Future<void> _addMember(
       BuildContext context, WidgetRef ref, List<Profile> current) async {
     final t = AppLocalizations.of(context);
-    final friends = ref.read(friendListProvider).value ?? const [];
+    final friends =
+        await loadForPicker(
+            context, ref.read(friendRepositoryProvider).fetchFriends());
+    if (friends == null || !context.mounted) return;
     final currentIds = current.map((p) => p.id).toSet();
     final candidates =
         friends.where((f) => !currentIds.contains(f.id)).toList();
@@ -150,12 +154,6 @@ class _Avatar extends StatelessWidget {
   final Profile profile;
   @override
   Widget build(BuildContext context) {
-    final initial = (profile.nickname ?? '?').characters.first.toUpperCase();
-    return CircleAvatar(
-      // ignore: deprecated_member_use
-      backgroundColor: AppColors.primary.withOpacity(0.18),
-      foregroundColor: AppColors.primary,
-      child: Text(initial),
-    );
+    return UserAvatar(profile: profile);
   }
 }

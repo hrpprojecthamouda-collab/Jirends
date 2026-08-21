@@ -65,6 +65,21 @@ class GroupRepository {
   }
 
   /// The friends currently in a group, as profiles (joined via the FK).
+  /// One-shot list of the caller's groups, alphabetised. Pickers want a
+  /// snapshot, not a subscription — see loadForPicker.
+  Future<List<FriendGroup>> fetchGroups() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return const [];
+    try {
+      final rows =
+          await _client.from('friend_groups').select().eq('owner_id', uid);
+      return rows.map(FriendGroup.fromJson).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    } catch (e) {
+      throw mapToFailure(e);
+    }
+  }
+
   Future<List<Profile>> fetchMembers(String groupId) async {
     try {
       final rows = await _client

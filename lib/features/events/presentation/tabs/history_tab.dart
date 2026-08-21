@@ -32,7 +32,7 @@ class HistoryTab extends ConsumerWidget {
                 padding: const EdgeInsets.all(24),
                 child: Text(t.historyEmpty,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.inkMuted)),
+                    style: TextStyle(color: AppColors.inkMuted)),
               ),
             )
           : ListView.builder(

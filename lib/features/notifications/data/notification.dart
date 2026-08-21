@@ -19,6 +19,7 @@ enum NotificationKind {
   eventMemberAdded,
   eventCancelled,
   eventConfirmed,
+  expenseAdded,
   other;
 
   static NotificationKind fromRaw(String raw) => switch (raw) {
@@ -27,6 +28,7 @@ enum NotificationKind {
         'event_member_added' => NotificationKind.eventMemberAdded,
         'event_cancelled' => NotificationKind.eventCancelled,
         'event_confirmed' => NotificationKind.eventConfirmed,
+        'expense_added' => NotificationKind.expenseAdded,
         _ => NotificationKind.other,
       };
 }

@@ -252,7 +252,7 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                       const SizedBox(width: 8),
                       Expanded(child: Text(_picked[i].label)),
                       IconButton(
-                        icon: const Icon(Icons.close,
+                        icon: Icon(Icons.close,
                             color: AppColors.inkMuted),
                         onPressed: () =>
                             setState(() => _picked.removeAt(i)),
@@ -284,7 +284,7 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
                       ),
                       if (_textOptions.length > 2)
                         IconButton(
-                          icon: const Icon(Icons.close,
+                          icon: Icon(Icons.close,
                               color: AppColors.inkMuted),
                           onPressed: () => setState(
                               () => _textOptions.removeAt(i).dispose()),
@@ -304,7 +304,7 @@ class _CreatePollSheetState extends ConsumerState<_CreatePollSheet> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(_error!,
-                    style: const TextStyle(color: AppColors.coral)),
+                    style: TextStyle(color: AppColors.coral)),
               ),
             const SizedBox(height: 12),
             FilledButton(

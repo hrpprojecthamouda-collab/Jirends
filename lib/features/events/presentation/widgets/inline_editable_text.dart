@@ -22,6 +22,7 @@ class InlineEditableText extends StatefulWidget {
     this.multiline = false,
     this.maxLength,
     this.leading,
+    this.onEditTap,
   });
 
   final String value;
@@ -34,6 +35,12 @@ class InlineEditableText extends StatefulWidget {
 
   /// Optional leading icon shown before the text in display mode.
   final IconData? leading;
+
+  /// When set, tapping hands editing over to this instead of switching to the
+  /// inline box — for a field that has outgrown a few lines and wants a page of
+  /// its own (the description). Display mode is unchanged either way, so the
+  /// field still looks like every other tappable field on the event.
+  final VoidCallback? onEditTap;
 
   @override
   State<InlineEditableText> createState() => _InlineEditableTextState();
@@ -93,15 +100,16 @@ class _InlineEditableTextState extends State<InlineEditableText> {
           Icon(widget.leading, size: 18, color: AppColors.inkMuted),
           const SizedBox(width: 10),
         ],
+        // No trailing edit pen. It reserved ~16px of every line for an icon
+        // that repeated on every field, and the description paid for it in
+        // early wraps. The row stays tappable for anyone who canEdit.
         Expanded(child: Text(text, style: style)),
-        if (widget.canEdit)
-          const Icon(Icons.edit_outlined, size: 16, color: AppColors.inkMuted),
       ],
     );
 
     if (!widget.canEdit) return content;
     return InkWell(
-      onTap: _start,
+      onTap: widget.onEditTap ?? _start,
       borderRadius: BorderRadius.circular(8),
       child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: content),
     );
@@ -115,6 +123,9 @@ class _InlineEditableTextState extends State<InlineEditableText> {
           child: TextField(
             controller: _controller,
             autofocus: true,
+            // Edit at the size it displays at. Without this a location typed
+            // at the TextField's default bodyLarge visibly shrank on save.
+            style: widget.style,
             minLines: widget.multiline ? 2 : 1,
             maxLines: widget.multiline ? 5 : 1,
             maxLength: widget.maxLength,
@@ -142,12 +153,12 @@ class _InlineEditableTextState extends State<InlineEditableText> {
                 children: [
                   IconButton(
                     tooltip: MaterialLocalizations.of(context).okButtonLabel,
-                    icon: const Icon(Icons.check, color: AppColors.teal),
+                    icon: Icon(Icons.check, color: AppColors.teal),
                     onPressed: _confirm,
                   ),
                   IconButton(
                     tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
-                    icon: const Icon(Icons.close, color: AppColors.coral),
+                    icon: Icon(Icons.close, color: AppColors.coral),
                     onPressed: _cancel,
                   ),
                 ],

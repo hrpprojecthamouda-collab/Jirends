@@ -11,10 +11,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/profile.dart';
-import '../../friends/application/friend_list_controller.dart';
 import '../application/group_list_controller.dart';
 import 'group_dialogs.dart';
 import 'member_picker.dart';
+import '../../profile/presentation/user_avatar.dart';
+import '../../friends/data/friend_repository.dart';
 
 class GroupDetailScreen extends ConsumerWidget {
   const GroupDetailScreen({super.key, required this.groupId});
@@ -44,7 +45,7 @@ class GroupDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: t.groupDelete,
-            icon: const Icon(Icons.delete_outline, color: AppColors.coral),
+            icon: Icon(Icons.delete_outline, color: AppColors.coral),
             onPressed: () async {
               final ok = await showConfirmDialog(
                 context,
@@ -74,7 +75,7 @@ class GroupDetailScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(t.groupAddMember,
-                      style: const TextStyle(color: AppColors.inkMuted)),
+                      style: TextStyle(color: AppColors.inkMuted)),
                 ),
               )
             : ListView(
@@ -86,7 +87,7 @@ class GroupDetailScreen extends ConsumerWidget {
                         leading: _Avatar(p),
                         title: Text(p.handle ?? '…'),
                         trailing: IconButton(
-                          icon: const Icon(Icons.person_remove_outlined,
+                          icon: Icon(Icons.person_remove_outlined,
                               color: AppColors.inkMuted),
                           onPressed: () => ref
                               .read(groupActionsControllerProvider.notifier)
@@ -103,7 +104,10 @@ class GroupDetailScreen extends ConsumerWidget {
   Future<void> _addFriend(
       BuildContext context, WidgetRef ref, List<Profile> current) async {
     final t = AppLocalizations.of(context);
-    final friends = ref.read(friendListProvider).value ?? const [];
+    final friends =
+        await loadForPicker(
+            context, ref.read(friendRepositoryProvider).fetchFriends());
+    if (friends == null || !context.mounted) return;
     final currentIds = current.map((p) => p.id).toSet();
     final candidates =
         friends.where((f) => !currentIds.contains(f.id)).toList();
@@ -126,12 +130,10 @@ class _Avatar extends StatelessWidget {
   final Profile profile;
   @override
   Widget build(BuildContext context) {
-    final initial = (profile.nickname ?? '?').characters.first.toUpperCase();
-    return CircleAvatar(
-      // ignore: deprecated_member_use
-      backgroundColor: AppColors.blue.withOpacity(0.18),
-      foregroundColor: AppColors.blue,
-      child: Text(initial),
+    return UserAvatar(
+      profile: profile,
+      background: AppColors.blue.withValues(alpha: .18),
+      foreground: AppColors.blue,
     );
   }
 }

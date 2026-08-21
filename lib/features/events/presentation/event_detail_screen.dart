@@ -1,8 +1,13 @@
-/// Event detail — the real screen (replaces the old stub). Tabbed:
-/// Overview / Members / Comments, for one event the user can see. All data is
-/// RLS-scoped; this screen renders what the DB returns and never decides
-/// visibility itself. A non-member who navigates here by id gets "unavailable"
-/// (indistinguishable from "doesn't exist", by design).
+/// Event detail — one scrollable page, no tabs. The header carries Share, the
+/// Toolbox (Expenses Center / History / copy link / delete) and the RSVP
+/// heart; everything else lives in the page itself (see overview_tab.dart):
+/// when/where, description, host + attendees, polls, comments, files. The
+/// roster, polls and toolbox destinations open as overlay panels
+/// ([showEventOverlaySheet]) rather than separate screens.
+///
+/// All data is RLS-scoped; this screen renders what the DB returns and never
+/// decides visibility itself. A non-member who navigates here by id gets
+/// "unavailable" (indistinguishable from "doesn't exist", by design).
 library;
 
 import 'package:flutter/material.dart';
@@ -21,14 +26,10 @@ import '../application/event_status_controller.dart';
 import '../data/event.dart';
 import '../data/event_member.dart';
 import '../data/event_phase.dart';
-import 'tabs/comments_tab.dart';
 import 'tabs/expenses_tab.dart';
-import 'tabs/files_tab.dart';
 import 'tabs/history_tab.dart';
-import 'tabs/items_tab.dart';
-import 'tabs/members_tab.dart';
 import 'tabs/overview_tab.dart';
-import 'tabs/polls_tab.dart';
+import 'widgets/event_overlay_sheet.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   const EventDetailScreen({super.key, required this.eventId});
@@ -84,13 +85,6 @@ class _DetailScaffold extends ConsumerWidget {
   const _DetailScaffold({required this.event});
   final Event event;
 
-  String _typeLabel(AppLocalizations t) => switch (event.eventType) {
-        EventType.trip => t.eventTypeTrip,
-        EventType.dinner => t.eventTypeDinner,
-        EventType.birthday => t.eventTypeBirthday,
-        EventType.meetup => t.eventTypeMeetup,
-      };
-
   /// Inline title edit via a small dialog (the AppBar is too cramped for an
   /// in-place editor). Organizer-only; RLS enforces regardless. We capture the
   /// notifier BEFORE the await so we never touch this widget's `ref`/`context`
@@ -111,16 +105,8 @@ class _DetailScaffold extends ConsumerWidget {
     await notifier.save(eventId, title: newTitle);
   }
 
-  // Index of the Files tab in the TabBar/TabBarView below. Tab order:
-  // 0 Overview, 1 Members, 2 Items, 3 Polls, 4 Comments, 5 Files, 6 History,
-  // 7 Expenses — keep this in sync when tabs are added or reordered. Expenses
-  // was appended last so this index didn't need to shift.
-  static const int _filesTabIndex = 5;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = AppLocalizations.of(context);
-    final typeColor = AppColors.forEventType(event.eventType);
     final myId = ref.watch(currentUserIdProvider);
     final members = ref.watch(eventMembersProvider(event.id)).value ?? const [];
     final canEdit = isCurrentUserOrganizer(members, myId);
@@ -128,107 +114,68 @@ class _DetailScaffold extends ConsumerWidget {
     final myMembership =
         members.where((m) => m.userId == myId).firstOrNull;
 
-    return DefaultTabController(
-      length: 8,
-      child: Scaffold(
-        // ── JIRA-ticket header row: back (auto) + Attachment + ⋮ + RSVP ──
-        appBar: AppBar(
-          titleSpacing: 0,
-          actions: [
-            // Attachment: its own button -> jump to the Files tab.
-            Builder(
-              builder: (context) => IconButton(
-                tooltip: t.eventAttachment,
-                icon: const Icon(Icons.attach_file),
-                onPressed: () =>
-                    DefaultTabController.of(context).animateTo(_filesTabIndex),
-              ),
-            ),
-            // Overflow: Share / Copy link / Delete (delete organizer-only).
-            _OverflowMenu(event: event, canDelete: canEdit),
-            // RSVP follow / following (only for members).
-            if (myMembership != null)
-              _FollowButton(event: event, membership: myMembership),
-            const SizedBox(width: 4),
-          ],
-          // ── Title + status below the header ──────────────────────────
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(132),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  child: InkWell(
-                    onTap: canEdit ? () => _editTitle(context, ref) : null,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(event.title,
-                              style: Theme.of(context).textTheme.headlineSmall),
-                        ),
-                        if (event.isSurprise)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Icon(Icons.visibility_off_outlined,
-                                size: 18, color: AppColors.yellow),
-                          ),
-                        if (canEdit)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Icon(Icons.edit_outlined,
-                                size: 16, color: AppColors.inkMuted),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Type label + status button row.
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    return Scaffold(
+      // ── Header row: back (auto) + Share + Toolbox + RSVP ──────────────
+      appBar: AppBar(
+        titleSpacing: 0,
+        actions: [
+          _ShareButton(event: event),
+          _ToolboxMenu(event: event, canDelete: canEdit),
+          // RSVP follow / following (only for members).
+          if (myMembership != null)
+            _FollowButton(event: event, membership: myMembership),
+          const SizedBox(width: 4),
+        ],
+        // ── Title + status below the header ──────────────────────────
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(84),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: InkWell(
+                  onTap: canEdit ? () => _editTitle(context, ref) : null,
+                  borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: [
-                      Text(_typeLabel(t),
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelMedium
-                              ?.copyWith(color: typeColor)),
-                      const Spacer(),
-                      _StatusChip(event: event, canEdit: canEdit),
+                      Expanded(
+                        child: Text(event.title,
+                            style: Theme.of(context).textTheme.headlineSmall),
+                      ),
+                      if (event.isSurprise)
+                        Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(Icons.visibility_off_outlined,
+                              size: 18, color: AppColors.yellow),
+                        ),
+                      // No edit pen. The whole row is still the tap target
+                      // for organizers; the icon only cost width that a long
+                      // title needed more.
                     ],
                   ),
                 ),
-                TabBar(
-                  isScrollable: true,
-                  tabs: [
-                    Tab(text: t.detailTabOverview),
-                    Tab(text: t.detailTabMembers),
-                    Tab(text: t.detailTabItems),
-                    Tab(text: t.detailTabPolls),
-                    Tab(text: t.detailTabComments),
-                    Tab(text: t.detailTabFiles),
-                    Tab(text: t.detailTabHistory),
-                    Tab(text: t.detailTabExpenses),
+              ),
+              // Status, on the left where the type label used to sit. The
+              // event type isn't shown at all: it only picks the template
+              // (phases + fields) at creation time and says nothing useful
+              // about the event afterwards.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    _StatusChip(event: event, canEdit: canEdit),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            OverviewTab(event: event),
-            MembersTab(event: event),
-            ItemsTab(eventId: event.id),
-            PollsTab(eventId: event.id),
-            CommentsTab(eventId: event.id),
-            FilesTab(eventId: event.id),
-            HistoryTab(eventId: event.id),
-            ExpensesTab(eventId: event.id),
-          ],
-        ),
       ),
+      // No tabs: the event is one scrollable page. Polls and the member roster
+      // open as overlay panels from within it; Expenses and History live in
+      // the toolbox; Files renders at the bottom of the page.
+      body: OverviewTab(event: event),
     );
   }
 }
@@ -255,43 +202,81 @@ class _FollowButton extends ConsumerWidget {
     final following = membership.rsvp == RsvpStatus.going;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: TextButton.icon(
+      child: IconButton(
+        tooltip: following ? t.eventFollowing : t.eventFollow,
         onPressed: () => ref
             .read(memberActionsControllerProvider.notifier)
             .setMyRsvp(event.id,
                 following ? RsvpStatus.declined : RsvpStatus.going),
-        icon: Icon(following ? Icons.star : Icons.star_border, size: 18),
-        label: Text(following ? t.eventFollowing : t.eventFollow),
-        style: TextButton.styleFrom(
-          foregroundColor: following ? AppColors.primary : AppColors.inkMuted,
-        ),
+        icon: Icon(following ? Icons.favorite : Icons.favorite_border, size: 18),
+        color: following ? AppColors.primary : AppColors.inkMuted,
       ),
     );
   }
 }
 
-/// Overflow menu: Share, Copy link, and (organizer-only) Delete. The link is a
-/// deep link to the event; it only opens for people who are already members
-/// (RLS), so it's a convenience, not a public share.
-class _OverflowMenu extends ConsumerWidget {
-  const _OverflowMenu({required this.event, required this.canDelete});
+/// Deep link to the event. It only opens for people who are already members
+/// (RLS), so sharing it is a convenience, not a public share.
+String _eventLink(Event event) => 'https://jirends.app/events/${event.id}';
+
+/// Share — promoted out of the old overflow menu to a first-class button.
+/// Long-press copies the link instead of opening the share sheet.
+class _ShareButton extends StatelessWidget {
+  const _ShareButton({required this.event});
+  final Event event;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final link = _eventLink(event);
+    return IconButton(
+      tooltip: t.eventShare,
+      icon: const Icon(Icons.ios_share),
+      onPressed: () => SharePlus.instance
+          .share(ShareParams(text: '${t.eventShareText(event.title)}\n$link')),
+      onLongPress: () async {
+        await Clipboard.setData(ClipboardData(text: link));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(SnackBar(content: Text(t.eventLinkCopied)));
+        }
+      },
+    );
+  }
+}
+
+/// Toolbox — the secondary destinations that no longer warrant a tab:
+/// Expenses Center and History, each opening as an overlay panel. Copy link
+/// and (organizer-only) Delete live here too, since they're event-level
+/// utilities rather than content.
+class _ToolboxMenu extends ConsumerWidget {
+  const _ToolboxMenu({required this.event, required this.canDelete});
   final Event event;
   final bool canDelete;
-
-  String get _link => 'https://jirends.app/events/${event.id}';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
+      tooltip: t.eventToolbox,
+      icon: const Icon(Icons.handyman_outlined),
       onSelected: (v) async {
         switch (v) {
-          case 'share':
-            await SharePlus.instance
-                .share(ShareParams(text: '${t.eventShareText(event.title)}\n$_link'));
+          case 'expenses':
+            await showEventOverlaySheet(
+              context,
+              title: t.detailTabExpenses,
+              child: ExpensesTab(eventId: event.id),
+            );
+          case 'history':
+            await showEventOverlaySheet(
+              context,
+              title: t.detailTabHistory,
+              child: HistoryTab(eventId: event.id),
+            );
           case 'copy':
-            await Clipboard.setData(ClipboardData(text: _link));
+            await Clipboard.setData(ClipboardData(text: _eventLink(event)));
             if (context.mounted) {
               ScaffoldMessenger.of(context)
                 ..clearSnackBars()
@@ -302,16 +287,41 @@ class _OverflowMenu extends ConsumerWidget {
         }
       },
       itemBuilder: (context) => [
-        PopupMenuItem(value: 'share', child: Text(t.eventShare)),
-        PopupMenuItem(value: 'copy', child: Text(t.eventCopyLink)),
-        if (canDelete) ...[
-          const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'expenses',
+          child: Row(children: [
+            const Icon(Icons.receipt_long_outlined, size: 18),
+            const SizedBox(width: 12),
+            Text(t.detailTabExpenses),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'history',
+          child: Row(children: [
+            const Icon(Icons.history, size: 18),
+            const SizedBox(width: 12),
+            Text(t.detailTabHistory),
+          ]),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'copy',
+          child: Row(children: [
+            const Icon(Icons.link, size: 18),
+            const SizedBox(width: 12),
+            Text(t.eventCopyLink),
+          ]),
+        ),
+        if (canDelete)
           PopupMenuItem(
             value: 'delete',
-            child: Text(t.eventDelete,
-                style: const TextStyle(color: AppColors.coral)),
+            child: Row(children: [
+              Icon(Icons.delete_outline, size: 18, color: AppColors.coral),
+              const SizedBox(width: 12),
+              Text(t.eventDelete,
+                  style: TextStyle(color: AppColors.coral)),
+            ]),
           ),
-        ],
       ],
     );
   }
@@ -425,7 +435,7 @@ class _StatusChip extends ConsumerWidget {
                     size: 12, color: AppColors.forPhaseKey(p.key)),
                 title: Text(p.label),
                 trailing: event.status == p.key
-                    ? const Icon(Icons.check, color: AppColors.primary)
+                    ? Icon(Icons.check, color: AppColors.primary)
                     : null,
                 onTap: () => Navigator.of(sheetContext).pop(p.key),
               ),
@@ -474,12 +484,12 @@ class _TitleEditDialogState extends State<_TitleEditDialog> {
       actions: [
         IconButton(
           tooltip: t.commonCancel,
-          icon: const Icon(Icons.close, color: AppColors.coral),
+          icon: Icon(Icons.close, color: AppColors.coral),
           onPressed: () => Navigator.of(context).pop(),
         ),
         IconButton(
           tooltip: t.commonAdd,
-          icon: const Icon(Icons.check, color: AppColors.teal),
+          icon: Icon(Icons.check, color: AppColors.teal),
           onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
         ),
       ],

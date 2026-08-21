@@ -67,7 +67,7 @@ class _AgendaViewState extends State<AgendaView> {
                 _selectedDay = _dateOnly(selectedDay);
                 _focusedDay = focusedDay;
               }),
-              calendarStyle: const CalendarStyle(
+              calendarStyle: CalendarStyle(
                 outsideDaysVisible: false,
                 defaultTextStyle: TextStyle(color: AppColors.ink),
                 weekendTextStyle: TextStyle(color: AppColors.inkMuted),
@@ -85,7 +85,7 @@ class _AgendaViewState extends State<AgendaView> {
                 ),
                 markersMaxCount: 3,
               ),
-              headerStyle: const HeaderStyle(
+              headerStyle: HeaderStyle(
                 formatButtonVisible: false,
                 titleCentered: true,
                 titleTextStyle:
@@ -95,7 +95,7 @@ class _AgendaViewState extends State<AgendaView> {
                 rightChevronIcon:
                     Icon(Icons.chevron_right, color: AppColors.inkMuted),
               ),
-              daysOfWeekStyle: const DaysOfWeekStyle(
+              daysOfWeekStyle: DaysOfWeekStyle(
                 weekdayStyle: TextStyle(color: AppColors.inkMuted),
                 weekendStyle: TextStyle(color: AppColors.inkMuted),
               ),
@@ -109,7 +109,7 @@ class _AgendaViewState extends State<AgendaView> {
                     padding: const EdgeInsets.all(24),
                     child: Text(t.agendaNoEventsOnDay,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.inkMuted)),
+                        style: TextStyle(color: AppColors.inkMuted)),
                   ),
                 )
               : ListView(

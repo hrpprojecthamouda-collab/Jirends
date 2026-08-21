@@ -163,6 +163,31 @@ class EventRepository {
       throw mapToFailure(e);
     }
   }
+
+  /// Attendee count per event, for the list cards. One query rather than one
+  /// per card: `event_members` is RLS-scoped to events the caller belongs to,
+  /// so selecting every visible membership row and tallying in Dart returns
+  /// exactly the counts the caller is entitled to — and nothing about events
+  /// they cannot see (a surprise target is in no such row, so the event they
+  /// are the target of contributes nothing here either).
+  ///
+  /// Only `event_id` is selected: the roster itself belongs to the members
+  /// screen, and the card needs a number, not names.
+  Stream<Map<String, int>> watchMemberCounts() {
+    return _client
+        .from('event_members')
+        // Composite primary key — both parts are required for the stream to
+        // track rows correctly.
+        .stream(primaryKey: ['event_id', 'user_id'])
+        .map((rows) {
+      final counts = <String, int>{};
+      for (final r in rows) {
+        final id = r['event_id'] as String?;
+        if (id != null) counts[id] = (counts[id] ?? 0) + 1;
+      }
+      return counts;
+    });
+  }
 }
 
 final eventRepositoryProvider = Provider<EventRepository>((ref) {

@@ -19,18 +19,39 @@ class PollView {
     required this.poll,
     required this.options,
     required this.tallies,
-    required this.myOptionId,
-    required this.closedVotes,
+    required this.myOptionIds,
+    required this.voterCount,
+    required this.votes,
   });
 
   final Poll poll;
   final List<PollOption> options;
   final Map<String, int> tallies; // optionId -> votes
-  final String? myOptionId; // the caller's chosen option, if any
-  final List<PollVote> closedVotes; // who-voted-what; only after close
+  /// Every option the caller has backed. A member may pick several.
+  final Set<String> myOptionIds;
 
+  /// Distinct people who voted — NOT the same as [totalVotes] once members can
+  /// back several options each. Comes from a member-gated RPC because an open
+  /// poll hides other members' vote rows (VIS-7).
+  ///
+  /// Null when that RPC is unavailable (e.g. the database has not had
+  /// polls_multivote.sql applied yet). Callers omit the figure rather than
+  /// guessing — `totalVotes` is NOT a stand-in, since one member may back
+  /// several options.
+  final int? voterCount;
+  /// Who voted for what, always populated. Ballot secrecy while a poll is open
+  /// (the old VIS-7) was deliberately retired — members may see each other's
+  /// votes at any time. Still member-scoped: a non-member reads none of it.
+  final List<PollVote> votes;
+
+  /// Total votes cast across all options. With multi-select this can exceed
+  /// [voterCount] — use that one when you mean "how many people".
   int get totalVotes => tallies.values.fold(0, (a, b) => a + b);
   int votesFor(String optionId) => tallies[optionId] ?? 0;
+
+  /// Everyone who backed [optionId], for the press-and-hold voters panel.
+  List<PollVote> votersFor(String optionId) =>
+      [for (final v in votes) if (v.optionId == optionId) v];
 }
 
 class PollRepository {
@@ -65,10 +86,11 @@ class PollRepository {
               .select('poll_id, option_id')
               .eq('event_id', eventId)
               .eq('user_id', uid);
-      final myOptionByPoll = <String, String>{
-        for (final r in myVoteRows)
-          r['poll_id'] as String: r['option_id'] as String,
-      };
+      final myOptionsByPoll = <String, Set<String>>{};
+      for (final r in myVoteRows) {
+        (myOptionsByPoll[r['poll_id'] as String] ??= <String>{})
+            .add(r['option_id'] as String);
+      }
 
       // All tallies for the event in one round-trip (member-gated RPC).
       final tallyRows = await _client
@@ -80,26 +102,49 @@ class PollRepository {
             row['option_id'] as String] = (row['votes'] as num).toInt();
       }
 
+      // Distinct voters per poll (see the RPC's comment in polls.sql).
+      //
+      // Deliberately non-fatal: this is one optional figure on a preview, and
+      // an older database that predates polls_multivote.sql simply has no such
+      // function. Letting that failure escape would take down the entire polls
+      // view — questions, options, votes and all — over a missing count. On
+      // failure every poll just reports an unknown voter count.
+      var votersByPoll = <String, int>{};
+      try {
+        final voterRows = await _client
+            .rpc('poll_voter_counts_for_event', params: {'p_event': eventId});
+        votersByPoll = {
+          for (final r in (voterRows as List))
+            (r as Map)['poll_id'] as String: (r['voters'] as num).toInt(),
+        };
+      } catch (_) {
+        // Leave it empty -> voterCount stays null per poll.
+      }
+
+      // Every vote in the event, in ONE query rather than one per poll. Open
+      // polls included: members may now see who voted at any time.
+      final voteRows = await _client
+          .from('poll_votes')
+          .select('id, poll_id, option_id, user_id, '
+              'voter:profiles!poll_votes_user_id_fkey(*)')
+          .eq('event_id', eventId);
+      final votesByPoll = <String, List<PollVote>>{};
+      for (final r in voteRows) {
+        (votesByPoll[r['poll_id'] as String] ??= <PollVote>[])
+            .add(PollVote.fromJson(r));
+      }
+
       final views = <PollView>[];
       for (final poll in polls) {
         final opts = options.where((o) => o.pollId == poll.id).toList();
         final tallies = talliesByPoll[poll.id] ?? const <String, int>{};
-        // After close, fetch the full who-voted-what breakdown (RLS allows it).
-        List<PollVote> closedVotes = const [];
-        if (poll.isClosed) {
-          final vrows = await _client
-              .from('poll_votes')
-              .select('id, poll_id, option_id, user_id, '
-                  'voter:profiles!poll_votes_user_id_fkey(*)')
-              .eq('poll_id', poll.id);
-          closedVotes = vrows.map(PollVote.fromJson).toList();
-        }
         views.add(PollView(
           poll: poll,
           options: opts,
           tallies: tallies,
-          myOptionId: myOptionByPoll[poll.id],
-          closedVotes: closedVotes,
+          myOptionIds: myOptionsByPoll[poll.id] ?? const <String>{},
+          voterCount: votersByPoll[poll.id],
+          votes: votesByPoll[poll.id] ?? const [],
         ));
       }
       return views;
@@ -146,16 +191,39 @@ class PollRepository {
   }
 
   /// Cast or change the caller's vote (one per poll). Upserts on (poll_id,user_id).
+  /// Toggle one option for the caller: back it if they haven't, withdraw it if
+  /// they have. Members may back several options in the same poll, so this no
+  /// longer replaces an existing vote — it only ever touches [optionId].
+  ///
+  /// Requires the widened `unique (poll_id, user_id, option_id)` key; against
+  /// the old per-poll key a second option is rejected (see
+  /// polls_multivote.sql).
   Future<void> vote(String pollId, String eventId, String optionId) async {
     final uid = _uid;
     if (uid == null) throw const AuthFailure('You are not signed in.');
     try {
-      await _client.from('poll_votes').upsert({
+      final existing = await _client
+          .from('poll_votes')
+          .select('id')
+          .eq('poll_id', pollId)
+          .eq('option_id', optionId)
+          .eq('user_id', uid)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _client
+            .from('poll_votes')
+            .delete()
+            .eq('id', existing['id'] as String);
+        return;
+      }
+
+      await _client.from('poll_votes').insert({
         'poll_id': pollId,
         'event_id': eventId,
         'option_id': optionId,
         'user_id': uid,
-      }, onConflict: 'poll_id,user_id');
+      });
     } catch (e) {
       throw mapToFailure(e);
     }

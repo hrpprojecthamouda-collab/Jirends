@@ -1,6 +1,15 @@
-/// Overview tab — description and when/where. Organizers can tap any field
-/// (description, location, dates) to edit it inline (tick to confirm, cross to
-/// cancel). The status lives in the app bar (top-right chip), not here.
+/// Overview — the event's single scrollable page, now that the TabBar is gone.
+/// In order: when, where, description, host + attendees, polls, comments,
+/// files. Organizers can tap any field (description, location, dates) to edit
+/// it inline (tick to confirm, cross to cancel). The status lives in the app
+/// bar (top-right chip), not here.
+///
+/// What used to be a tab is now either inline (comments, files), a row that
+/// opens an overlay panel (polls, and the roster via the attendees strip), or
+/// a toolbox entry in the app bar (expenses, history). The comment compose bar
+/// ([CommentComposeBubble]) sits inline under the thread — idle it's 50%
+/// opacity so it doesn't compete with the content, and comes to full opacity
+/// once tapped or holding a draft.
 library;
 
 import 'package:flutter/material.dart';
@@ -8,12 +17,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/supabase/supabase_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/util/weekday.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../application/event_detail_controller.dart';
 import '../../application/event_list_controller.dart';
 import '../../data/event.dart';
 import '../event_detail_screen.dart';
+import '../widgets/comment_compose_bubble.dart';
+import '../widgets/comment_thread.dart';
+import '../widgets/description_editor_sheet.dart';
+import '../widgets/event_overlay_sheet.dart';
+import '../widgets/host_attendees_row.dart';
 import '../widgets/inline_editable_text.dart';
+import '../widgets/polls_preview.dart';
+import 'files_tab.dart';
+import 'polls_tab.dart';
 
 class OverviewTab extends ConsumerWidget {
   const OverviewTab({super.key, required this.event});
@@ -25,63 +43,128 @@ class OverviewTab extends ConsumerWidget {
     final myId = ref.watch(currentUserIdProvider);
     final members = ref.watch(eventMembersProvider(event.id)).value ?? const [];
     final isOrganizer = isCurrentUserOrganizer(members, myId);
-    final myConflicts = ref.watch(myConflictsProvider(event.id)).value ?? const [];
+    final myConflicts =
+        ref.watch(myConflictsProvider(event.id)).value ?? const [];
 
     final edit = ref.read(editEventControllerProvider.notifier);
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: [
-        // Self-conflict banner: safe to name the other event here — the
-        // viewer is, by definition, a member of both (see myConflictsProvider).
-        if (myConflicts.isNotEmpty)
-          _ConflictBanner(
-            text: t.eventConflictBanner(
-              myConflicts.length,
-              myConflicts.map((c) => c.title).join(', '),
+    // The compose bubble scrolls WITH the page, sitting directly under the
+    // comment thread. It used to float over everything via a Stack, which was
+    // fine while Comments was the last section — but now Polls sits above it
+    // and Files below, and a floating bar silently swallowed taps meant for
+    // those rows. Inline keeps it adjacent to what it composes and unable to
+    // cover anything.
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        children: [
+          // Self-conflict banner: safe to name the other event here — the
+          // viewer is, by definition, a member of both (see myConflictsProvider).
+          if (myConflicts.isNotEmpty)
+            _ConflictBanner(
+              text: t.eventConflictBanner(
+                myConflicts.length,
+                myConflicts.map((c) => c.title).join(', '),
+              ),
+            ),
+          // Date block. No label: the calendar icon already says "when".
+          _Block(
+            child: _DatesRow(event: event, canEdit: isOrganizer),
+          ),
+          // Place block. No label: the pin icon already says "where".
+          _Block(
+            child: InlineEditableText(
+              value: event.location ?? '',
+              placeholder: t.detailWhere,
+              canEdit: isOrganizer,
+              leading: Icons.place_outlined,
+              // Matches the date row above it — both are facts about the
+              // event, ranked below the description.
+              style: Theme.of(context).textTheme.bodyMedium,
+              onSubmit: (v) => edit.save(
+                event.id,
+                location: v.isEmpty ? null : v,
+                clearLocation: v.isEmpty,
+              ),
             ),
           ),
-        // Description block — bigger. Soft separation only (label + hairline).
-        _Block(
-          label: t.detailDescription,
-          minHeight: 140,
-          child: InlineEditableText(
-            value: event.description ?? '',
-            placeholder: t.detailNoDescription,
-            canEdit: isOrganizer,
-            multiline: true,
-            maxLength: 2000,
-            onSubmit: (v) => edit.save(
-              event.id,
-              description: v.isEmpty ? null : v,
-              clearDescription: v.isEmpty,
+          // Description. No reserved min-height any more: the card gives it
+          // presence on its own, so a one-word description no longer sits in a
+          // tall empty box. Unlike the date and the location, editing it opens
+          // a full-height sheet — it's a paragraph, not a value.
+          _Block(
+            label: t.detailDescription,
+            child: InlineEditableText(
+              value: event.description ?? '',
+              placeholder: t.detailNoDescription,
+              canEdit: isOrganizer,
+              multiline: true,
+              maxLength: 2000,
+              onEditTap: () => _editDescription(context, event, edit),
+              onSubmit: (v) => edit.save(
+                event.id,
+                description: v.isEmpty ? null : v,
+                clearDescription: v.isEmpty,
+              ),
             ),
           ),
-        ),
-        // Date block.
-        _Block(
-          label: t.detailWhen,
-          child: _DatesRow(event: event, canEdit: isOrganizer),
-        ),
-        // Place block (last one: no trailing divider).
-        _Block(
-          label: t.detailWhere,
-          divider: false,
-          child: InlineEditableText(
-            value: event.location ?? '',
-            placeholder: t.detailWhere,
-            canEdit: isOrganizer,
-            leading: Icons.place_outlined,
-            onSubmit: (v) => edit.save(
-              event.id,
-              location: v.isEmpty ? null : v,
-              clearLocation: v.isEmpty,
+          // Host + attendees, straight after the description. Tapping
+          // either side opens the roster/RSVP panel.
+          _Block(child: HostAttendeesRow(event: event)),
+          // Polls — previews each poll (question, voters, open/closed) and
+          // opens the full panel on tap.
+          _Block(
+            child: PollsPreview(
+              eventId: event.id,
+              onOpen: () => showEventOverlaySheet(
+                context,
+                title: t.detailTabPolls,
+                child: PollsTab(eventId: event.id),
+              ),
             ),
           ),
-        ),
-      ],
+          // Comment thread + its compose bar, together.
+          _Block(
+            label: t.detailTabComments,
+            child: Column(
+              children: [
+                CommentThread(eventId: event.id),
+                const SizedBox(height: 10),
+                CommentComposeBubble(eventId: event.id),
+              ],
+            ),
+          ),
+          // Files last, per the layout spec.
+          _Block(
+            label: t.detailTabFiles,
+            child: FilesTab(eventId: event.id, shrinkWrap: true),
+          ),
+        ],
+      ),
     );
   }
+}
+
+/// Open the full-height description editor and persist whatever comes back.
+/// A null result means the user backed out, which is not the same as clearing
+/// the description — only an empty string saved on purpose does that.
+Future<void> _editDescription(
+  BuildContext context,
+  Event event,
+  EditEventController edit,
+) async {
+  final text = await showDescriptionEditor(
+    context,
+    initial: event.description ?? '',
+    maxLength: 2000,
+  );
+  if (text == null) return;
+  await edit.save(
+    event.id,
+    description: text.isEmpty ? null : text,
+    clearDescription: text.isEmpty,
+  );
 }
 
 /// A dismissible-for-this-session warning banner shown to a member who has a
@@ -114,20 +197,25 @@ class _ConflictBannerState extends State<_ConflictBanner> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.warning_amber_outlined,
-                size: 18, color: AppColors.coral),
+            Icon(
+              Icons.warning_amber_outlined,
+              size: 18,
+              color: AppColors.coral,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 1),
-                child: Text(widget.text,
-                    style: const TextStyle(color: AppColors.coral)),
+                child: Text(
+                  widget.text,
+                  style: TextStyle(color: AppColors.coral),
+                ),
               ),
             ),
             InkWell(
               onTap: () => setState(() => _dismissed = true),
               borderRadius: BorderRadius.circular(16),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.all(4),
                 child: Icon(Icons.close, size: 16, color: AppColors.coral),
               ),
@@ -139,44 +227,56 @@ class _ConflictBannerState extends State<_ConflictBanner> {
   }
 }
 
-/// A soft "block" of overview data: a small muted label above the content, with
-/// generous spacing and a hairline divider below (unless [divider] is false).
-/// Not a card — just a visual grouping/separation. [minHeight] lets the
-/// description block be visibly taller.
+/// One section of the event page, rendered as its own card: an optional small
+/// muted label above the content, on an [AppColors.surface] panel separated
+/// from its neighbours by margin rather than a hairline.
+///
+/// The styling is deliberately LOCAL rather than the global `cardTheme`: that
+/// theme is shared by list items across ~16 other screens (friends, groups,
+/// home feed, the events list…), and restyling sections here must not drag
+/// those along.
+///
+/// Sections whose children were themselves cards (comments, files) render them
+/// flat inside this one — a card inside a card reads as visual noise.
+/// [label] can be omitted when the content already carries its own affordance
+/// (e.g. a leading icon).
 class _Block extends StatelessWidget {
-  const _Block({
-    required this.label,
-    required this.child,
-    this.minHeight = 0,
-    this.divider = true,
-  });
-  final String label;
+  const _Block({this.label, required this.child});
+  final String? label;
   final Widget child;
-  final double minHeight;
-  final bool divider;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 18),
-        Text(
-          label.toUpperCase(),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.inkMuted,
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null) ...[
+            Text(
+              label!.toUpperCase(),
+              // ExtraBold on full ink, not muted grey. At caption size these
+              // were the weakest thing on the page — small, light AND low
+              // contrast — so the sections they name did not read as sections
+              // at all. Weight alone was not enough; the colour was doing as
+              // much of the damage as the size.
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.ink,
                 letterSpacing: 1.1,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
-        ),
-        const SizedBox(height: 8),
-        ConstrainedBox(
-          constraints: BoxConstraints(minHeight: minHeight),
-          child: Align(alignment: Alignment.topLeft, child: child),
-        ),
-        const SizedBox(height: 18),
-        if (divider) const Divider(height: 1, color: AppColors.outline),
-      ],
+            ),
+            const SizedBox(height: 10),
+          ],
+          Align(alignment: Alignment.topLeft, child: child),
+        ],
+      ),
     );
   }
 }
@@ -184,8 +284,13 @@ class _Block extends StatelessWidget {
 String _fmtDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-String _fmtDateTime(DateTime d) =>
-    '${_fmtDate(d)}  ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+/// Date prefixed with its weekday, e.g. "Sat 30/08/2026" — saves the reader
+/// working out which day of the week that is.
+String _fmtDay(AppLocalizations t, DateTime d) =>
+    '${weekdayShort(t, d)} ${_fmtDate(d)}';
+
+String _fmtDateTime(AppLocalizations t, DateTime d) =>
+    '${_fmtDay(t, d)}  ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
 /// The "When" row. For a TRIP it shows a date range and edits start+end days;
 /// for any other type it shows a single date+time and edits that (ends_at stays
@@ -204,31 +309,47 @@ class _DatesRow extends ConsumerWidget {
     if (s == null) {
       text = t.detailWhen;
     } else if (event.isTrip) {
-      text = e == null ? _fmtDate(s) : '${_fmtDate(s)} → ${_fmtDate(e)}';
+      text = e == null
+          ? _fmtDay(t, s)
+          : '${_fmtDay(t, s)} → ${_fmtDay(t, e)}';
     } else {
-      text = _fmtDateTime(s);
+      text = _fmtDateTime(t, s);
     }
     final hasValue = s != null;
 
     final row = Row(
       children: [
-        const Icon(Icons.event_outlined, size: 18, color: AppColors.inkMuted),
+        Icon(Icons.event_outlined, size: 18, color: AppColors.inkMuted),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(text,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: hasValue ? AppColors.ink : AppColors.inkMuted)),
+          child: Text(
+            text,
+            // bodyMedium, a step under the description's bodyLarge. When
+            // when/where/what all shared one size the page had no hierarchy:
+            // the description is the content, these two are its facts.
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: hasValue ? AppColors.ink : AppColors.inkMuted,
+            ),
+          ),
         ),
-        if (canEdit)
-          const Icon(Icons.edit_outlined, size: 16, color: AppColors.inkMuted),
+        // No edit pen — see InlineEditableText for why.
       ],
     );
 
-    if (!canEdit) return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: row);
+    if (!canEdit) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: row,
+      );
+    }
     return InkWell(
-      onTap: () => event.isTrip ? _editRange(context, ref) : _editSingle(context, ref),
+      onTap: () =>
+          event.isTrip ? _editRange(context, ref) : _editSingle(context, ref),
       borderRadius: BorderRadius.circular(8),
-      child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: row),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: row,
+      ),
     );
   }
 
@@ -250,12 +371,9 @@ class _DatesRow extends ConsumerWidget {
       lastDate: DateTime(now.year + 5),
       helpText: AppLocalizations.of(context).createFieldEnds,
     );
-    await ref.read(editEventControllerProvider.notifier).save(
-          event.id,
-          startsAt: start,
-          endsAt: end,
-          clearEndsAt: end == null,
-        );
+    await ref
+        .read(editEventControllerProvider.notifier)
+        .save(event.id, startsAt: start, endsAt: end, clearEndsAt: end == null);
   }
 
   // Non-trip: single date + time -> starts_at; ends_at always cleared.
@@ -273,12 +391,14 @@ class _DatesRow extends ConsumerWidget {
       initialTime: TimeOfDay.fromDateTime(event.startsAt?.toLocal() ?? now),
     );
     final dt = DateTime(
-        day.year, day.month, day.day, time?.hour ?? 0, time?.minute ?? 0);
-    await ref.read(editEventControllerProvider.notifier).save(
-          event.id,
-          startsAt: dt,
-          clearEndsAt: true,
-        );
+      day.year,
+      day.month,
+      day.day,
+      time?.hour ?? 0,
+      time?.minute ?? 0,
+    );
+    await ref
+        .read(editEventControllerProvider.notifier)
+        .save(event.id, startsAt: dt, clearEndsAt: true);
   }
 }
-

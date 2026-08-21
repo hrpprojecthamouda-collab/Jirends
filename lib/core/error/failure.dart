@@ -65,8 +65,22 @@ Failure mapToFailure(Object error) {
   if (error is PostgrestException) {
     // SQLSTATE codes raised by our schema/guards.
     switch (error.code) {
-      case '23505': // unique_violation — handle taken, dup membership, etc.
-        return const ConflictFailure('That handle is already taken.');
+      case '23505': // unique_violation
+        // Every uniqueness conflict in the app lands here — a taken handle, a
+        // duplicate membership, a repeated vote or reaction. Reporting them
+        // all as "that handle is already taken" is actively misleading
+        // (a second poll vote used to say exactly that), so key off the
+        // constraint/column named in the error and fall back to something
+        // honest and generic.
+        final detail =
+            '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
+                .toLowerCase();
+        if (detail.contains('nickname') ||
+            detail.contains('tagline') ||
+            detail.contains('handle')) {
+          return const ConflictFailure('That handle is already taken.');
+        }
+        return const ConflictFailure('That has already been added.');
       case '23503': // foreign_key_violation — bad status/phase, missing ref
       case '23514': // check_violation — surprise guard, length checks
         return PermissionFailure(error.message);

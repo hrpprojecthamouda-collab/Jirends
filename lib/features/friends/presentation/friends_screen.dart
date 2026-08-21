@@ -16,6 +16,7 @@ import '../../notifications/presentation/widgets/notification_bell_button.dart';
 import '../../profile/presentation/profile_avatar_button.dart';
 import '../../shell/presentation/placeholder_body.dart';
 import '../application/friend_list_controller.dart';
+import '../../profile/presentation/user_avatar.dart';
 
 class FriendsScreen extends ConsumerWidget {
   const FriendsScreen({super.key});
@@ -91,20 +92,14 @@ class _FriendTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final handle = profile.handle ?? '…';
-    final initial = (profile.nickname ?? '?').characters.first.toUpperCase();
 
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          // ignore: deprecated_member_use
-          backgroundColor: AppColors.primary.withOpacity(0.18),
-          foregroundColor: AppColors.primary,
-          child: Text(initial),
-        ),
+        leading: UserAvatar(profile: profile),
         title: Text(handle),
         trailing: IconButton(
           tooltip: t.friendsRemove,
-          icon: const Icon(Icons.person_remove_outlined,
+          icon: Icon(Icons.person_remove_outlined,
               color: AppColors.inkMuted),
           onPressed: () => _confirmRemove(context, ref, handle),
         ),

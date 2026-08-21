@@ -61,7 +61,7 @@ class ExpensesTab extends ConsumerWidget {
                 padding: const EdgeInsets.all(24),
                 child: Text(t.expenseEmpty,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.inkMuted)),
+                    style: TextStyle(color: AppColors.inkMuted)),
               )
             else
               for (final e in expenses)
@@ -106,7 +106,7 @@ class _SettleUpCard extends ConsumerWidget {
               error: (e, _) => Text(messageForError(e)),
               data: (transfers) => transfers.isEmpty
                   ? Text(t.settleUpEmpty,
-                      style: const TextStyle(color: AppColors.inkMuted))
+                      style: TextStyle(color: AppColors.inkMuted))
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -157,11 +157,11 @@ class _ExpenseTile extends ConsumerWidget {
         title: Text(expense.description),
         subtitle: Text(
           '${expense.payer.handle ?? '…'} · ${t.expenseSplitCount(expense.shares.length)}',
-          style: const TextStyle(color: AppColors.inkMuted),
+          style: TextStyle(color: AppColors.inkMuted),
         ),
         trailing: canDelete
             ? IconButton(
-                icon: const Icon(Icons.delete_outline, color: AppColors.coral),
+                icon: Icon(Icons.delete_outline, color: AppColors.coral),
                 tooltip: t.expenseDelete,
                 onPressed: () => _confirmDelete(context, ref),
               )
@@ -196,7 +196,7 @@ class _ExpenseTile extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(t.expenseDelete,
-                style: const TextStyle(color: AppColors.coral)),
+                style: TextStyle(color: AppColors.coral)),
           ),
         ],
       ),

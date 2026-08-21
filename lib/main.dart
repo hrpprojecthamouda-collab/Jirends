@@ -7,6 +7,7 @@ import 'core/i18n/fallback_material_localizations.dart';
 import 'core/i18n/locale_controller.dart';
 import 'core/supabase/supabase_providers.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/palette_controller.dart';
 import 'l10n/app_localizations.dart';
 import 'routing/app_router.dart';
 
@@ -22,6 +23,9 @@ Future<void> main() async {
   }
 
   await initSupabase();
+  // Restore the chosen palette before the first frame, so the app never shows
+  // the default and then snaps to the saved one.
+  await loadSavedPalette();
   runApp(const ProviderScope(child: JirendsApp()));
 }
 
@@ -32,12 +36,30 @@ class JirendsApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final locale = ref.watch(localeProvider);
+    // Watching the palette is what rebuilds the whole tree when the user picks
+    // a different one in Settings.
+    final palette = ref.watch(paletteProvider);
     return MaterialApp.router(
+      // Re-keying on the palette is what makes a theme change actually repaint.
+      // Widgets read colours from AppColors — a plain global, not an
+      // InheritedWidget — so a new ThemeData does not mark them dirty, and most
+      // screens are `const`, which makes Flutter skip rebuilding them entirely
+      // (Element.update short-circuits on an identical widget). Keying a
+      // subtree *inside* the app doesn't help either: WidgetsApp gives its
+      // Navigator a GlobalKey, so the whole route subtree is moved rather than
+      // rebuilt. Replacing the MaterialApp is what forces every screen to
+      // re-read its colours. The route stack lives in the GoRouter (held by
+      // Riverpod, outside this widget), so the current page is restored.
+      key: ValueKey(palette.id),
       title: 'Jirends',
       debugShowCheckedModeBanner: false,
-      // Dark-first; light() returns the dark theme for now.
-      theme: AppTheme.dark(),
-      themeMode: ThemeMode.dark,
+      // One theme, built from the chosen palette. themeMode follows the
+      // palette's own brightness rather than the device, so the picked look is
+      // exactly what you get.
+      theme: AppTheme.of(palette),
+      themeMode: palette.brightness == Brightness.dark
+          ? ThemeMode.dark
+          : ThemeMode.light,
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [

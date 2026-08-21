@@ -294,18 +294,25 @@ begin
     insert into public.poll_options (poll_id,event_id,label,position) values (pmaj,ev,'Pizza',1) returning id into o1;
     insert into public.poll_options (poll_id,event_id,label,position) values (pmaj,ev,'Sushi',2) returning id into o2;
 
-    -- Bob and Carol vote Pizza; a second vote by Bob is rejected (one per member).
+    -- Bob votes Pizza AND Sushi: multi-select is allowed (polls_multivote.sql
+    -- widened the unique key to (poll_id,user_id,option_id)). Backing the same
+    -- option twice is still rejected, which is what makes tap-to-toggle safe.
     insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o1,bob);
+    insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o2,bob);
     ok := false;
-    begin insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o2,bob);
+    begin insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o1,bob);
     exception when unique_violation then ok := true; end;
-    if not ok then raise exception '❌ ASSERTION FAILED: a member must not vote twice in a poll'; end if;
+    if not ok then raise exception '❌ ASSERTION FAILED: a member must not back the same option twice'; end if;
+    -- Undo Bob's Sushi vote so the majority assertion below still means Pizza.
+    delete from public.poll_votes where poll_id=pmaj and user_id=bob and option_id=o2;
     perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
     insert into public.poll_votes (poll_id,event_id,option_id,user_id) values (pmaj,ev,o1,carol);
 
-    -- While OPEN, Carol can't read Bob's vote row (but can read her own).
+    -- VIS-7 RETIRED: while the poll is still OPEN, Carol can already read Bob's
+    -- vote. Members press-and-hold an option to see who backed it, so ballot
+    -- secrecy was dropped by product decision.
     select count(*) into n from public.poll_votes where poll_id=pmaj and user_id=bob;
-    if n <> 0 then raise exception '❌ ASSERTION FAILED: open poll must not reveal another member''s vote'; end if;
+    if n <> 1 then raise exception '❌ ASSERTION FAILED: an open poll must show other members'' votes (VIS-7 retired)'; end if;
 
     -- CARDINAL: the surprise target (Dave) sees no poll at all.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
@@ -321,10 +328,16 @@ begin
     select winning_option_id, is_tie into w, tie from public.polls where id=pmaj;
     if w <> o1 or tie then raise exception '❌ ASSERTION FAILED: majority winner should be Pizza, no tie'; end if;
 
-    -- After CLOSE, Carol can now read Bob's vote (full transparency).
+    -- After CLOSE, votes stay readable (they already were).
     perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
     select count(*) into n from public.poll_votes where poll_id=pmaj and user_id=bob;
     if n <> 1 then raise exception '❌ ASSERTION FAILED: closed poll must reveal all votes'; end if;
+
+    -- CARDINAL: widening votes to every MEMBER must not widen them to everyone.
+    -- Dave is the surprise target and no member of this event.
+    perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
+    select count(*) into n from public.poll_votes where poll_id=pmaj;
+    if n <> 0 then raise exception '❌ CARDINAL: a non-member must not read poll votes'; end if;
   end;
 
   -- ════════════════════════════════════════════════════════════════════════

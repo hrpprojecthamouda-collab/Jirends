@@ -174,7 +174,7 @@ class _CreateExpenseSheetState extends ConsumerState<_CreateExpenseSheet> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(_error!,
-                    style: const TextStyle(color: AppColors.coral)),
+                    style: TextStyle(color: AppColors.coral)),
               ),
             const SizedBox(height: 12),
             FilledButton(

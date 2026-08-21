@@ -47,6 +47,8 @@ dependencies:
   url_launcher: ^6.3.2
   share_plus: ^12.0.2
   google_fonts: ^8.1.0
+  # Remembers the chosen colour palette across launches (see app_palette.dart).
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

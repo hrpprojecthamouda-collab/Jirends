@@ -1,6 +1,13 @@
 /// Notification bottom sheet — lists the caller's notifications (newest
-/// first), one icon+message+time row per kind. Opening the sheet marks
-/// everything read. Read-only: no per-item actions.
+/// first), one icon+message+time row per kind.
+///
+/// Opening the sheet marks everything read, which is why the unread rows are
+/// highlighted from a SNAPSHOT taken the moment it opened rather than from
+/// `isUnread`. Reading the live flag would highlight nothing: the update lands
+/// before the first frame is on screen, so "what's new" would be invisible at
+/// exactly the moment the user came to look for it.
+///
+/// Read-only otherwise: no per-item actions.
 library;
 
 import 'package:flutter/material.dart';
@@ -33,19 +40,46 @@ class _NotificationSheet extends ConsumerStatefulWidget {
 }
 
 class _NotificationSheetState extends ConsumerState<_NotificationSheet> {
-  @override
-  void initState() {
-    super.initState();
-    // Mark everything read once the sheet is actually shown.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(notificationActionsControllerProvider.notifier).markAllRead();
+  /// Which notifications were unread when this sheet opened. Fixed for the
+  /// lifetime of the sheet, so marking them read does not erase the highlight
+  /// out from under the reader.
+  Set<String> _newOnOpen = const {};
+  bool _captured = false;
+
+  /// Take the snapshot, then mark read — in that order, or the update races
+  /// the snapshot and nothing is ever highlighted.
+  void _captureThenMarkRead(List<AppNotification> notifications) {
+    if (_captured) return;
+    _captured = true;
+    setState(() {
+      _newOnOpen = {
+        for (final n in notifications)
+          if (n.isUnread) n.id,
+      };
     });
+    if (_newOnOpen.isEmpty) return; // nothing to clear
+    ref.read(notificationActionsControllerProvider.notifier).markAllRead();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+
+    // The bell badge watches this provider on every top-level screen, so it is
+    // normally already loaded when the sheet opens. The listener covers the
+    // cold case (deep link, slow first load) where it is not.
+    ref.listen(myNotificationsProvider, (_, next) {
+      final list = next.value;
+      if (list != null && !_captured) _captureThenMarkRead(list);
+    });
+
     final notificationsAsync = ref.watch(myNotificationsProvider);
+    final loaded = notificationsAsync.value;
+    if (loaded != null && !_captured) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _captureThenMarkRead(loaded);
+      });
+    }
 
     return SafeArea(
       top: false,
@@ -70,14 +104,16 @@ class _NotificationSheetState extends ConsumerState<_NotificationSheet> {
                           padding: const EdgeInsets.all(24),
                           child: Text(t.notificationsEmpty,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.inkMuted)),
+                              style: TextStyle(color: AppColors.inkMuted)),
                         ),
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: notifications.length,
-                        itemBuilder: (context, i) =>
-                            _NotificationTile(notification: notifications[i]),
+                        itemBuilder: (context, i) => _NotificationTile(
+                          notification: notifications[i],
+                          isNew: _newOnOpen.contains(notifications[i].id),
+                        ),
                       ),
               ),
             ),
@@ -89,8 +125,15 @@ class _NotificationSheetState extends ConsumerState<_NotificationSheet> {
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.notification});
+  const _NotificationTile({
+    required this.notification,
+    required this.isNew,
+  });
   final AppNotification notification;
+
+  /// Unread when the sheet opened — see [_NotificationSheetState]. NOT
+  /// `notification.isUnread`, which is already false by the time this builds.
+  final bool isNew;
 
   (IconData, Color) _iconFor(NotificationKind k) => switch (k) {
         NotificationKind.friendAdded => (Icons.person_add_alt_1, AppColors.primary),
@@ -98,6 +141,8 @@ class _NotificationTile extends StatelessWidget {
         NotificationKind.eventMemberAdded => (Icons.event_available, AppColors.blue),
         NotificationKind.eventConfirmed => (Icons.check_circle_outline, AppColors.teal),
         NotificationKind.eventCancelled => (Icons.cancel_outlined, AppColors.coral),
+        NotificationKind.expenseAdded =>
+          (Icons.receipt_long_outlined, AppColors.yellow),
         NotificationKind.other => (Icons.notifications_outlined, AppColors.inkMuted),
       };
 
@@ -112,6 +157,8 @@ class _NotificationTile extends StatelessWidget {
         t.notificationEventCancelled(n.event?.title ?? ''),
       NotificationKind.eventConfirmed =>
         t.notificationEventConfirmed(n.event?.title ?? ''),
+      NotificationKind.expenseAdded =>
+        t.notificationExpenseAdded(who, n.event?.title ?? ''),
       NotificationKind.other => '',
     };
   }
@@ -122,22 +169,44 @@ class _NotificationTile extends StatelessWidget {
     final (icon, color) = _iconFor(notification.kindEnum);
     final eventId = notification.eventId;
 
-    return ListTile(
-      leading: CircleAvatar(
-        // ignore: deprecated_member_use
-        backgroundColor: color.withOpacity(0.18),
-        foregroundColor: color,
-        child: Icon(icon, size: 20),
+    return Container(
+      // Three cues, not one: a tinted ground, a heavier message, and a dot.
+      // Colour alone would exclude anyone who cannot distinguish it, and at
+      // 7% alpha the tint is deliberately faint — it should mark the row, not
+      // shout over the message on it.
+      color: isNew ? AppColors.primary.withValues(alpha: .07) : null,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.18),
+          foregroundColor: color,
+          child: Icon(icon, size: 20),
+        ),
+        title: Text(
+          _messageFor(t, notification),
+          style: isNew ? const TextStyle(fontWeight: FontWeight.w700) : null,
+        ),
+        subtitle: Text(formatShortTime(notification.createdAt.toLocal()),
+            style: TextStyle(color: AppColors.inkMuted)),
+        trailing: isNew
+            ? Semantics(
+                label: t.notificationUnread,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              )
+            : null,
+        onTap: eventId == null
+            ? null
+            : () {
+                Navigator.of(context).pop();
+                context.push(AppRoutes.eventDetail(eventId));
+              },
       ),
-      title: Text(_messageFor(t, notification)),
-      subtitle: Text(formatShortTime(notification.createdAt.toLocal()),
-          style: const TextStyle(color: AppColors.inkMuted)),
-      onTap: eventId == null
-          ? null
-          : () {
-              Navigator.of(context).pop();
-              context.push(AppRoutes.eventDetail(eventId));
-            },
     );
   }
 }

@@ -172,7 +172,8 @@ create index if not exists comments_parent_idx on public.comments (parent_id);
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- reactions — carry event_id explicitly for RLS scoping (per the cardinal rule).
--- A user reacts once per (target, emoji). Reactions target either a comment or
+-- A user holds at most ONE reaction per target: choosing another emoji replaces
+-- it, choosing the current one clears it. Reactions target either a comment or
 -- the event itself (comment_id null => reaction on the event).
 -- ────────────────────────────────────────────────────────────────────────────
 create table if not exists public.reactions (
@@ -184,13 +185,34 @@ create table if not exists public.reactions (
   created_at timestamptz not null default now()
 );
 
--- One reaction per user per emoji per target. Two partial indexes because NULL
+-- ONE reaction per user per target (emoji deliberately NOT in the key — that is
+-- what makes the reaction exclusive). Two partial indexes because NULL
 -- comment_id (reaction-on-event) must still be deduped.
+--
+-- MIGRATING an existing database: these indexes replace the older
+-- (…, user_id, emoji) ones, which allowed a user several emojis on one target.
+-- Drop the old indexes and collapse any duplicates FIRST, or the create fails:
+--
+--   drop index if exists public.reactions_unique_on_comment;
+--   drop index if exists public.reactions_unique_on_event;
+--   delete from public.reactions r using public.reactions keep
+--    where r.user_id = keep.user_id
+--      and r.event_id = keep.event_id
+--      and r.comment_id is not distinct from keep.comment_id
+--      and (keep.created_at, keep.id) > (r.created_at, r.id);
+--   -- then create the two indexes below (keeps each user's most recent)
 create unique index if not exists reactions_unique_on_comment
-  on public.reactions (comment_id, user_id, emoji) where comment_id is not null;
+  on public.reactions (comment_id, user_id) where comment_id is not null;
 create unique index if not exists reactions_unique_on_event
-  on public.reactions (event_id, user_id, emoji) where comment_id is null;
+  on public.reactions (event_id, user_id) where comment_id is null;
 create index if not exists reactions_event_idx on public.reactions (event_id);
+
+-- REQUIRED for un-reacting to show up live. Realtime only ships the columns in
+-- a table's replica identity; with the default (primary key only) a DELETE
+-- payload has no event_id, so the client's `.stream().eq('event_id', …)` filter
+-- can't match it and the delete is dropped — the emoji stays on screen and
+-- counts only ever grow. FULL puts every column in the payload.
+alter table public.reactions replica identity full;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- attachments — metadata; bytes live in Storage bucket 'event-attachments'

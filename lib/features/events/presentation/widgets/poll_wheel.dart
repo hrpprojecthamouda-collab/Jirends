@@ -31,13 +31,16 @@ class _PollWheelState extends State<PollWheel>
   late final AnimationController _ctrl;
   late final Animation<double> _turns;
 
-  static const _palette = [
-    AppColors.violet,
-    AppColors.blue,
-    AppColors.teal,
-    AppColors.coral,
-    AppColors.yellow,
-  ];
+  // Not const: these read through to the palette chosen in Settings, so the
+  // wheel recolours with the rest of the app. A getter rather than a field so
+  // it re-reads after a palette change instead of caching the old colours.
+  static List<Color> get _palette => [
+        AppColors.violet,
+        AppColors.blue,
+        AppColors.teal,
+        AppColors.coral,
+        AppColors.yellow,
+      ];
 
   @override
   void initState() {
@@ -87,7 +90,7 @@ class _PollWheelState extends State<PollWheel>
       child: Column(
         children: [
           // Pointer.
-          const Icon(Icons.arrow_drop_down, color: AppColors.ink, size: 28),
+          Icon(Icons.arrow_drop_down, color: AppColors.ink, size: 28),
           Expanded(
             child: AnimatedBuilder(
               animation: _turns,

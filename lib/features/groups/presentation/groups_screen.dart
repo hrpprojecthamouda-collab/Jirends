@@ -66,13 +66,13 @@ class GroupsScreen extends ConsumerWidget {
                       for (final g in list)
                         Card(
                           child: ListTile(
-                            leading: const CircleAvatar(
+                            leading: CircleAvatar(
                               backgroundColor: AppColors.surfaceHi,
                               foregroundColor: AppColors.blue,
                               child: Icon(Icons.lock_outline),
                             ),
                             title: Text(g.name),
-                            trailing: const Icon(Icons.chevron_right,
+                            trailing: Icon(Icons.chevron_right,
                                 color: AppColors.inkMuted),
                             onTap: () =>
                                 context.push(AppRoutes.groupDetail(g.id)),
@@ -106,13 +106,13 @@ class GroupsScreen extends ConsumerWidget {
                       for (final c in list)
                         Card(
                           child: ListTile(
-                            leading: const CircleAvatar(
+                            leading: CircleAvatar(
                               backgroundColor: AppColors.surfaceHi,
                               foregroundColor: AppColors.primary,
                               child: Icon(Icons.groups_2_outlined),
                             ),
                             title: Text(c.name),
-                            trailing: const Icon(Icons.chevron_right,
+                            trailing: Icon(Icons.chevron_right,
                                 color: AppColors.inkMuted),
                             onTap: () =>
                                 context.push(AppRoutes.crewDetail(c.id)),
@@ -190,7 +190,7 @@ class _Error extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.all(12),
-        child: Text(message, style: const TextStyle(color: AppColors.coral)),
+        child: Text(message, style: TextStyle(color: AppColors.coral)),
       );
 }
 

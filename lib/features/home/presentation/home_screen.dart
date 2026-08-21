@@ -1,6 +1,6 @@
 /// Home — an activity feed of recent goings-on across the user's VISIBLE events
-/// (comments, new items). Every entry is derived from a member-scoped row, so it
-/// can never name or hint at an event the user can't see (cardinal rule, safe by
+/// (comments). Every entry is derived from a member-scoped row, so it can never
+/// name or hint at an event the user can't see (cardinal rule, safe by
 /// construction — see ActivityRepository). Tapping an entry opens its event.
 library;
 
@@ -67,16 +67,55 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final who = item.actorHandle ?? t.activitySomeone;
+    // Icon + tint per activity, so the feed is scannable by shape and colour
+    // before you read a word of it.
     final (icon, color, title) = switch (item.kind) {
       ActivityKind.comment => (
           Icons.chat_bubble_outline,
           AppColors.blue,
-          t.activityComment(item.actorHandle ?? t.activitySomeone, item.eventTitle),
+          t.activityComment(who, item.eventTitle),
         ),
-      ActivityKind.item => (
-          Icons.check_box_outlined,
+      ActivityKind.reply => (
+          Icons.forum_outlined,
+          AppColors.blue,
+          t.activityReply(who, item.eventTitle),
+        ),
+      ActivityKind.pollClosed => (
+          Icons.how_to_vote_outlined,
           AppColors.teal,
-          t.activityItem(item.eventTitle),
+          t.activityPollClosed(who, item.eventTitle),
+        ),
+      ActivityKind.pollReopened => (
+          Icons.how_to_vote_outlined,
+          AppColors.violet,
+          t.activityPollReopened(who, item.eventTitle),
+        ),
+      ActivityKind.attachment => (
+          Icons.attach_file,
+          AppColors.yellow,
+          t.activityAttachment(who, item.eventTitle),
+        ),
+      ActivityKind.rsvpGoing => (
+          Icons.event_available_outlined,
+          AppColors.teal,
+          t.activityRsvpGoing(who, item.eventTitle),
+        ),
+      ActivityKind.rsvpNotGoing => (
+          Icons.event_busy_outlined,
+          AppColors.coral,
+          t.activityRsvpNotGoing(who, item.eventTitle),
+        ),
+      ActivityKind.memberAdded => (
+          Icons.person_add_alt_1,
+          AppColors.violet,
+          t.activityMemberAdded(who, item.eventTitle),
+        ),
+      // One entry per poll: two names inline, a count beyond that.
+      ActivityKind.pollVoted => (
+          Icons.how_to_vote_outlined,
+          AppColors.blue,
+          _votedLine(t, item),
         ),
     };
 
@@ -113,3 +152,39 @@ class _ActivityTile extends StatelessWidget {
     return '${diff.inDays}d';
   }
 }
+
+/// "X and Y voted on the time poll in Z", switching on how many people voted.
+///
+/// A general poll has no distinguishing kind, and it cannot be written as an
+/// empty {kind} placeholder: "voted on the {kind} poll" with kind = "" renders
+/// as "voted on the  poll", double space and all, because the template owns the
+/// spaces either side. Only a separate sentence can drop the word cleanly, so
+/// the kindless case gets its own keys.
+String _votedLine(AppLocalizations t, ActivityItem item) {
+  final who =
+      item.voterNames.isEmpty ? t.activitySomeone : item.voterNames.first;
+  final kind = _pollKindLabel(t, item.pollKind);
+  final event = item.eventTitle;
+
+  if (kind == null) {
+    return switch (item.voterCount) {
+      0 || 1 => t.activityVotedOnePlain(who, event),
+      2 => t.activityVotedTwoPlain(who, item.voterNames.last, event),
+      _ => t.activityVotedManyPlain(item.voterCount, event),
+    };
+  }
+  return switch (item.voterCount) {
+    0 || 1 => t.activityVotedOne(who, kind, event),
+    2 => t.activityVotedTwo(who, item.voterNames.last, kind, event),
+    _ => t.activityVotedMany(item.voterCount, kind, event),
+  };
+}
+
+/// The poll's kind as it reads in a sentence, or null for a general poll —
+/// which has no kind to name at all. See [_votedLine].
+String? _pollKindLabel(AppLocalizations t, String? kind) => switch (kind) {
+      'date' => t.pollKindDate.toLowerCase(),
+      'time' => t.pollKindTime.toLowerCase(),
+      'place' => t.pollKindPlace.toLowerCase(),
+      _ => null,
+    };

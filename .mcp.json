@@ -6,6 +6,10 @@
       "headers": {
         "x-supabase-project-ref": "qmdtkgrzcenfplcktvjj"
       }
+    },
+    "atlassian": {
+      "type": "http",
+      "url": "https://mcp.atlassian.com/v1/mcp/authv2"
     }
   }
 }

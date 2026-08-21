@@ -88,7 +88,11 @@ create table if not exists public.poll_votes (
   option_id  uuid not null references public.poll_options(id) on delete cascade,
   user_id    uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  unique (poll_id, user_id)   -- one vote per member per poll
+  -- One vote per member per OPTION: a member may back several options in the
+  -- same poll, but not the same option twice (which is what makes the app's
+  -- tap-to-toggle safe against a double tap). See polls_multivote.sql for the
+  -- migration that widened this from (poll_id, user_id).
+  unique (poll_id, user_id, option_id)
 );
 create index if not exists poll_votes_poll_idx on public.poll_votes (poll_id);
 
@@ -152,6 +156,30 @@ end;
 $$;
 revoke all on function public.poll_tallies_for_event(uuid) from public;
 grant execute on function public.poll_tallies_for_event(uuid) to authenticated;
+
+-- Distinct voters per poll. Separate from the tallies because with multi-select
+-- votes != voters, and the event page's polls preview wants voters rather than
+-- a raw vote count. An RPC rather than a client-side count because the preview
+-- needs one number per poll for the whole event, and a count(distinct) in the
+-- database beats shipping every vote row to the phone to length-check it.
+create or replace function public.poll_voter_counts_for_event(p_event uuid)
+returns table(poll_id uuid, voters bigint)
+language plpgsql stable security definer set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_event_member(p_event) then
+    return;  -- not a member: no rows
+  end if;
+  return query
+    select p.id, count(distinct v.user_id)::bigint
+    from public.polls p
+    left join public.poll_votes v on v.poll_id = p.id
+    where p.event_id = p_event
+    group by p.id;
+end;
+$$;
+revoke all on function public.poll_voter_counts_for_event(uuid) from public;
+grant execute on function public.poll_voter_counts_for_event(uuid) to authenticated;
 
 -- Atomic poll creation: poll + options in one call so a failure can't leave an
 -- option-less poll behind. SECURITY INVOKER on purpose — the inserts run as
@@ -501,13 +529,20 @@ drop policy if exists poll_votes_delete_own on public.poll_votes;
 create policy poll_votes_delete_own on public.poll_votes
   for delete to authenticated using (user_id = auth.uid());
 
+-- Any member of the event can see any vote in it, open or closed.
+--
+-- This used to be the narrower `user_id = auth.uid() or is_poll_closed(...)`
+-- (ballot secrecy while open, spec rule VIS-7). VIS-7 was RETIRED by product
+-- decision: members press-and-hold a poll option to see who backed it, which
+-- is only possible if the rows are readable. Applied live as migration
+-- `poll_votes_visible_to_all_members`; this file is the record of it.
+--
+-- The cardinal rule is untouched — `is_event_member(event_id)` still gates
+-- everything, so a non-member (a surprise target included) reads nothing.
 drop policy if exists poll_votes_select on public.poll_votes;
 create policy poll_votes_select on public.poll_votes
   for select to authenticated
-  using (
-    public.is_event_member(event_id)
-    and (user_id = auth.uid() or public.is_poll_closed(poll_id))
-  );
+  using (public.is_event_member(event_id));
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Event history hook — log a poll's creation on the event's change log.

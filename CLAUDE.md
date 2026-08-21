@@ -6,15 +6,14 @@ Guidance for Claude Code working in this repo. Read this before every task.
 
 A mobile app (Flutter) for organising events with friends — trips, dinners,
 birthdays, meetups. Each event is a "ticket": title, description, status,
-date, attachments, members, comments, reactions, and assignable sub-items
-("who brings dessert"). Think Jira stripped down to the social essentials —
-**not** Jira's surface area. Backend is Supabase (Postgres + Auth + Realtime +
-Storage).
+date, attachments, members, comments, and reactions. Think Jira stripped down
+to the social essentials — **not** Jira's surface area. Backend is Supabase
+(Postgres + Auth + Realtime + Storage).
 
 ## THE CARDINAL RULE — read this twice
 
 **Visibility equals membership, and it is enforced in the database, never in
-the client.** A user can see an event (and its comments, items, reactions,
+the client.** A user can see an event (and its comments, reactions,
 attachments) if and only if a row links them to it in `event_members`. This is
 the entire reason the app exists: a "surprise birthday party" must be
 physically unreadable to its target.
@@ -71,7 +70,6 @@ then all the repositories. Keep the app runnable at every commit.
 - `profiles` — mirror of `auth.users`, auto-created on signup.
 - `events` — the ticket. `surprise_target` (nullable) = the user it's hidden from.
 - `event_members` — membership == visibility. `role` (organizer/member), `rsvp`.
-- `event_items` — assignable sub-tasks.
 - `comments`, `reactions` (reactions carry `event_id` for RLS scoping).
 - `attachments` — metadata; bytes in Storage bucket `event-attachments`,
   path `{event_id}/{filename}`.
@@ -85,7 +83,7 @@ membership subqueries into policies; call the functions.
 This is "Jira without the unnecessary parts." Resist rebuilding Jira.
 
 In scope (v1): events with a small fixed status set
-(idea → planning → confirmed → done/cancelled), members, assignable items,
+(idea → planning → confirmed → done/cancelled), members,
 comments, reactions, attachments, simple RSVP, the surprise mechanic, expenses
 with equal-split settle-up (Tricount-style: log who paid and who it's split
 between; the app computes a minimum-transaction settle-up — read-only, no
@@ -97,6 +95,9 @@ Date-polling is explicitly **v2** — don't pull it forward. Expense-splitting
 extensions (unequal/custom splits, multi-currency, marking transfers as
 settled) are also v2 — the v1 expenses feature is equal-split-only, read-only
 settle-up.
+
+Assignable sub-items ("who brings dessert" — the old Items tab) were
+**deliberately removed** to cut UI clutter. Do not reintroduce them.
 
 ## Conventions
 
@@ -128,7 +129,25 @@ flutter test
 flutter run                                                  # device/emulator
 ```
 
-Backend: apply `schema.sql`, then `social_layer.sql`, `event_types.sql`,
-`crews.sql` (shared/visible "crew" groups — Type 2), and `polls.sql` (per-event
-polls with majority / weighted-random resolution) in the Supabase SQL editor,
-then run `rls_tests.sql` to confirm the visibility model holds.
+Backend: apply these in the Supabase SQL editor **in order** — later files
+depend on tables the earlier ones create:
+
+1. `schema.sql` — events, members, comments, reactions, attachments.
+2. `social_layer.sql` — friends, groups, notifications.
+3. `event_types.sql` — the creation templates.
+4. `crews.sql` — shared/visible "crew" groups (Type 2).
+5. `polls.sql` — per-event polls, majority / weighted-random resolution.
+6. `polls_multivote.sql` — widens the vote key so a member can back several
+   options in one poll, and adds the distinct-voter count RPC.
+7. `activity_feed.sql` — `event_members.rsvp_at` (stamped only when an answer
+   changes) plus the expense notification, both of which the Home feed reads.
+8. `avatars.sql` — the public `avatars` Storage bucket and its owner-scoped
+   write policies.
+
+Then run `rls_tests.sql` to confirm the visibility model holds.
+
+Files 6–8 are migrations against an already-applied `schema.sql`/`polls.sql`,
+not standalone schemas. Skipping one does not fail loudly: the app compiles and
+most of it works, but the Home feed 42703s on the missing `rsvp_at` column and
+takes the whole feed down with it. If a feature is inexplicably broken on a
+fresh database, check this list first.

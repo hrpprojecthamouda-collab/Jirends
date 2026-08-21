@@ -39,6 +39,21 @@ final eventReactionsProvider =
   return ref.watch(reactionRepositoryProvider).watchReactions(eventId);
 });
 
+/// Identifies one reaction target: the event itself ([commentId] null) or a
+/// specific comment. A record so Riverpod's family gets structural equality.
+typedef ReactionTarget = ({String eventId, String? commentId});
+
+/// Everyone who reacted to one target, joined to their profiles — backs the
+/// "who reacted" sheet. autoDispose: it's opened on demand and should re-fetch
+/// next time rather than serve a stale roster.
+final reactionUsersProvider = FutureProvider.autoDispose
+    .family<List<Reaction>, ReactionTarget>((ref, target) {
+  return ref.watch(reactionRepositoryProvider).fetchReactionsWithUsers(
+        target.eventId,
+        commentId: target.commentId,
+      );
+});
+
 class CommentActionsController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -75,14 +90,21 @@ class CommentActionsController extends AsyncNotifier<void> {
     return !state.hasError;
   }
 
-  Future<void> toggleReaction(
+  /// Set the caller's single reaction on a target (see
+  /// [ReactionRepository.setMyReaction]): a different emoji replaces the
+  /// current one, the same emoji clears it.
+  Future<void> setMyReaction(
     String eventId, {
     String? commentId,
     required String emoji,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() =>
-        _reactions.toggleReaction(eventId, commentId: commentId, emoji: emoji));
+        _reactions.setMyReaction(eventId, commentId: commentId, emoji: emoji));
+    // Refresh the who-reacted roster so a sheet opened right after a tap
+    // reflects the change (the realtime stream drives the chips, not this).
+    ref.invalidate(
+        reactionUsersProvider((eventId: eventId, commentId: commentId)));
   }
 }
 

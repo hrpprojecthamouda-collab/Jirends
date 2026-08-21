@@ -58,7 +58,7 @@ class PollsTab extends ConsumerWidget {
                   padding: const EdgeInsets.all(24),
                   child: Text(t.pollsEmpty,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.inkMuted)),
+                      style: TextStyle(color: AppColors.inkMuted)),
                 ),
               )
             // Pull-to-refresh: the poll list is a one-shot fetch invalidated by
