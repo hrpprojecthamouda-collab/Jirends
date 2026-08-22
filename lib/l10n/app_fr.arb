@@ -342,5 +342,7 @@
   "@activityVotedTwoPlain": { "placeholders": { "a": { "type": "String" }, "b": { "type": "String" }, "event": { "type": "String" } } },
   "activityVotedManyPlain": "{count} personnes ont voté au sondage dans {event}",
   "@activityVotedManyPlain": { "placeholders": { "count": { "type": "int" }, "event": { "type": "String" } } },
-  "notificationUnread": "Non lu"
+  "notificationUnread": "Non lu",
+  "notificationCommentMention": "{who} t’a mentionné dans {event}",
+  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } }
 }

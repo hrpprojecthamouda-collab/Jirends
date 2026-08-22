@@ -375,5 +375,7 @@
   "@activityVotedTwoPlain": { "placeholders": { "a": { "type": "String" }, "b": { "type": "String" }, "event": { "type": "String" } } },
   "activityVotedManyPlain": "{count} people voted on the poll in {event}",
   "@activityVotedManyPlain": { "placeholders": { "count": { "type": "int" }, "event": { "type": "String" } } },
-  "notificationUnread": "Unread"
+  "notificationUnread": "Unread",
+  "notificationCommentMention": "{who} mentioned you in {event}",
+  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } }
 }

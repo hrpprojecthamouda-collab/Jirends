@@ -20,6 +20,10 @@ enum NotificationKind {
   eventCancelled,
   eventConfirmed,
   expenseAdded,
+
+  /// Somebody tagged you in a comment. Only ever sent to event MEMBERS —
+  /// see comment_mentions.sql for why that is a hard rule, not a nicety.
+  commentMention,
   other;
 
   static NotificationKind fromRaw(String raw) => switch (raw) {
@@ -29,6 +33,7 @@ enum NotificationKind {
         'event_cancelled' => NotificationKind.eventCancelled,
         'event_confirmed' => NotificationKind.eventConfirmed,
         'expense_added' => NotificationKind.expenseAdded,
+        'comment_mention' => NotificationKind.commentMention,
         _ => NotificationKind.other,
       };
 }
@@ -44,6 +49,8 @@ abstract class AppNotification with _$AppNotification {
     required String kind,
     String? eventId,
     String? crewId,
+    /// The comment the mention was in (comment_mention only).
+    String? commentId,
     DateTime? readAt,
     required DateTime createdAt,
     Profile? actor,

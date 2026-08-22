@@ -319,7 +319,10 @@ class _DatesRow extends ConsumerWidget {
 
     final row = Row(
       children: [
-        Icon(Icons.event_outlined, size: 18, color: AppColors.inkMuted),
+        // Full ink, not muted. With no label above it ("When" was dropped
+        // because the icon says it), this glyph IS the field's name — it
+        // cannot be the faintest thing on the card.
+        Icon(Icons.event_outlined, size: 18, color: AppColors.ink),
         const SizedBox(width: 10),
         Expanded(
           child: Text(

@@ -13,9 +13,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/supabase/supabase_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../application/comment_controller.dart';
+import '../../application/event_detail_controller.dart';
+import 'mention_suggestions.dart';
 
 class CommentComposeBubble extends ConsumerStatefulWidget {
   const CommentComposeBubble({super.key, required this.eventId});
@@ -49,6 +52,23 @@ class _CommentComposeBubbleState extends ConsumerState<CommentComposeBubble> {
 
   void _onFocusChange() => setState(() => _active = _computeActive());
   void _onTextChange() => setState(() => _active = _computeActive());
+
+  /// The mention being typed right now, or null. Recomputed on every build
+  /// from the controller rather than cached, so it stays correct when the
+  /// caret moves without the text changing.
+  MentionQuery? get _mention => _focusNode.hasFocus
+      ? mentionQueryAt(_input.text, _input.selection.baseOffset)
+      : null;
+
+  void _insertMention(MentionQuery query, profile) {
+    final result = applyMention(_input.text, query, profile);
+    _input.value = TextEditingValue(
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.caret),
+    );
+    // Stay in the field: people usually keep typing after a mention.
+    _focusNode.requestFocus();
+  }
   bool _computeActive() => _focusNode.hasFocus || _input.text.isNotEmpty;
 
   Future<void> _send() async {
@@ -69,6 +89,34 @@ class _CommentComposeBubbleState extends ConsumerState<CommentComposeBubble> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+
+    // Members only — a mention notification names its event, so it may only
+    // ever reach someone who can already see it (comment_mentions.sql).
+    final myId = ref.watch(currentUserIdProvider);
+    final members =
+        ref.watch(eventMembersProvider(widget.eventId)).value ?? const [];
+    final query = _mention;
+    final matches = query == null
+        ? const []
+        : matchMembers(
+            [for (final m in members) if (m.userId != myId) m],
+            query.text,
+          );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (query != null)
+          MentionSuggestions(
+            matches: matches.cast(),
+            onPick: (profile) => _insertMention(query, profile),
+          ),
+        _bubble(context, t),
+      ],
+    );
+  }
+
+  Widget _bubble(BuildContext context, AppLocalizations t) {
     return AnimatedOpacity(
       opacity: _active ? 1.0 : 0.5,
       duration: const Duration(milliseconds: 180),

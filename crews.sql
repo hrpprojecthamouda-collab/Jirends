@@ -413,6 +413,15 @@ create trigger trg_notify_event_status_change
 
 -- Expose notifications to realtime so the bell badge updates live (RLS still
 -- applies — a user's stream only ever carries their own rows).
+--
+-- REPLICA IDENTITY FULL is not optional here. The badge subscribes with a
+-- filter on recipient_id, and under the default identity an UPDATE ships only
+-- the primary key in its old row — so Postgres cannot match the filter and the
+-- event is dropped. The read/unread transition is an UPDATE, which is to say
+-- exactly the change the badge exists to follow. Same trap as reactions, where
+-- a filtered DELETE meant the counter only ever went up.
+alter table public.notifications replica identity full;
+
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then

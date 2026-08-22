@@ -343,5 +343,7 @@
   "@activityVotedTwoPlain": { "placeholders": { "a": { "type": "String" }, "b": { "type": "String" }, "event": { "type": "String" } } },
   "activityVotedManyPlain": "{count} nas votaw fi sondage fi {event}",
   "@activityVotedManyPlain": { "placeholders": { "count": { "type": "int" }, "event": { "type": "String" } } },
-  "notificationUnread": "Mahouch ma9ri"
+  "notificationUnread": "Mahouch ma9ri",
+  "notificationCommentMention": "{who} 3ayyatlek fi {event}",
+  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } }
 }

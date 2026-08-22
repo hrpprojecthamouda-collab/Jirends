@@ -97,7 +97,9 @@ class _InlineEditableTextState extends State<InlineEditableText> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.leading != null) ...[
-          Icon(widget.leading, size: 18, color: AppColors.inkMuted),
+          // Full ink for the same reason as the calendar: these fields
+          // carry no text label, so the icon does the naming.
+          Icon(widget.leading, size: 18, color: AppColors.ink),
           const SizedBox(width: 10),
         ],
         // No trailing edit pen. It reserved ~16px of every line for an icon

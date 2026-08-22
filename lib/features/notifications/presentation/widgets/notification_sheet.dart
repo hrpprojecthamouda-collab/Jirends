@@ -143,6 +143,8 @@ class _NotificationTile extends StatelessWidget {
         NotificationKind.eventCancelled => (Icons.cancel_outlined, AppColors.coral),
         NotificationKind.expenseAdded =>
           (Icons.receipt_long_outlined, AppColors.yellow),
+        NotificationKind.commentMention =>
+          (Icons.alternate_email, AppColors.primary),
         NotificationKind.other => (Icons.notifications_outlined, AppColors.inkMuted),
       };
 
@@ -159,6 +161,8 @@ class _NotificationTile extends StatelessWidget {
         t.notificationEventConfirmed(n.event?.title ?? ''),
       NotificationKind.expenseAdded =>
         t.notificationExpenseAdded(who, n.event?.title ?? ''),
+      NotificationKind.commentMention =>
+        t.notificationCommentMention(who, n.event?.title ?? ''),
       NotificationKind.other => '',
     };
   }
