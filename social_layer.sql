@@ -137,7 +137,7 @@ grant execute on function public.add_friend_by_handle(text) to authenticated;
 -- assign_group_to_event — expand a friend group into individual event_members
 -- rows. This is the ONLY sanctioned bridge between groups and events, and it is
 -- a one-time snapshot: it copies the group's CURRENT members in. The caller
--- must own the group and be an organizer of the event. The surprise-target
+-- must own the group and be an organizer of the event. The friend
 -- guard trigger still applies to each inserted row, so a group containing the
 -- target simply skips that one (we swallow the trigger error per-row).
 -- Returns the count of members actually added.
@@ -180,18 +180,16 @@ begin
     if not public.is_friend(r.friend_id) then
       continue;
     end if;
-    begin
-      insert into public.event_members (event_id, user_id, role, added_by)
-      values (p_event, r.friend_id, 'member', v_me)
-      on conflict (event_id, user_id) do nothing;
-      if found then
-        v_added := v_added + 1;
-      end if;
-    exception
-      when check_violation then
-        -- surprise-target guard (or similar) rejected this one row; skip it.
-        continue;
-    end;
+    -- No per-row exception handler any more. It existed to swallow the
+    -- surprise-target guard, which is retired; with that gone a check_violation
+    -- here would be a genuine bug, and aborting the batch surfaces it rather
+    -- than silently dropping somebody from the event.
+    insert into public.event_members (event_id, user_id, role, added_by)
+    values (p_event, r.friend_id, 'member', v_me)
+    on conflict (event_id, user_id) do nothing;
+    if found then
+      v_added := v_added + 1;
+    end if;
   end loop;
 
   return v_added;
@@ -252,21 +250,24 @@ create policy fgm_delete_owner on public.friend_group_members
   );
 
 -- ════════════════════════════════════════════════════════════════════════════
--- TIGHTEN event_members INSERT — replace the schema.sql policy with the
--- stricter rule: to add an INDIVIDUAL you must be an organizer AND they must be
--- your friend. (The batch path, assign_group_to_event, is SECURITY DEFINER and
--- does its own ownership/organizer/friend checks, so it bypasses this policy.)
--- Adding yourself (RSVP self-join is not a thing here; the creator row comes in
--- via the SECURITY DEFINER trigger) is therefore not a special case.
--- ════════════════════════════════════════════════════════════════════════════
+-- ============================================================================
+-- event_members INSERT -- organizer only.
+--
+-- This used to additionally require `is_friend(user_id)`: you could only add
+-- people already in your address book. That was dropped along with the surprise
+-- mechanic, so an organizer can now add anyone they can name.
+--
+-- IMPORTANT: this policy is NOT an exhaustive account of who can join an event.
+-- assign_group_to_event and assign_crew_to_event are SECURITY DEFINER and
+-- bypass it entirely, doing their own ownership/organizer checks; the
+-- invite-link RPC does the same, with possession of a valid token as its
+-- authorization. Read those functions too before reasoning about membership.
+-- ============================================================================
 drop policy if exists event_members_insert_organizer on public.event_members;
 drop policy if exists event_members_insert_friend on public.event_members;
-create policy event_members_insert_friend on public.event_members
+create policy event_members_insert_organizer on public.event_members
   for insert to authenticated
-  with check (
-    public.is_event_organizer(event_id)
-    and public.is_friend(user_id)
-  );
+  with check (public.is_event_organizer(event_id));
 
 -- Expose friends tables to realtime (RLS still applies).
 do $$

@@ -41,7 +41,6 @@ abstract class Event with _$Event {
     /// The user the event is hidden from. Null for normal events. The DB keeps
     /// the target out of event_members and refuses to add them — this field is
     /// purely informational for organizers who can see the event.
-    String? surpriseTarget,
     required String createdBy,
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -49,7 +48,6 @@ abstract class Event with _$Event {
 
   factory Event.fromJson(Map<String, dynamic> json) => _$EventFromJson(json);
 
-  bool get isSurprise => surpriseTarget != null;
 
   /// Only trips span a date RANGE (starts_at -> ends_at). Every other type
   /// happens at a single date+time (stored in starts_at; ends_at stays null).

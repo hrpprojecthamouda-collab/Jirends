@@ -1,10 +1,10 @@
 /// Agenda view — a month calendar (table_calendar) with a dot on each day that
 /// has one or more of YOUR events, and below it the selected day's events.
 ///
-/// CARDINAL-RULE NOTE: this reads only [eventListProvider] (RLS-scoped to the
+/// VISIBILITY NOTE: this reads only [eventListProvider] (RLS-scoped to the
 /// user's visible events). It is NOT a free/busy overlay — it never shows or
-/// infers anything about events the user can't see. A surprise hidden from the
-/// user simply isn't in the list, so it never appears on any day.
+/// infers anything about events the user can't see. An event they are not a
+/// member of simply isn't in the list, so it never appears on any day.
 library;
 
 import 'package:flutter/material.dart';

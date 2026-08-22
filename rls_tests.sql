@@ -22,7 +22,7 @@ declare
   alice uuid := '11111111-1111-1111-1111-111111111111';
   bob   uuid := '22222222-2222-2222-2222-222222222222';
   carol uuid := '33333333-3333-3333-3333-333333333333';
-  dave  uuid := '44444444-4444-4444-4444-444444444444';  -- the surprise target
+  dave  uuid := '44444444-4444-4444-4444-444444444444';  -- never a member of ev
   stranger uuid := '55555555-5555-5555-5555-555555555555';
   clash uuid := '99999999-9999-9999-9999-999999999999';
   ev uuid; ev_trip uuid; ev_dinner uuid; grp uuid; crew uuid; ev_crew uuid;
@@ -104,13 +104,13 @@ begin
   perform public.add_friend_by_handle('Bob#TheCrew');
 
   -- ════════════════════════════════════════════════════════════════════════
-  -- TEST 3 — THE CARDINAL RULE. Surprise party for Dave; Dave sees nothing.
+  -- TEST 3 — VISIBILITY IS MEMBERSHIP. Dave is never added; Dave sees nothing.
   -- ════════════════════════════════════════════════════════════════════════
   perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
   perform public.add_friend_by_handle('Carol#TheCrew');
 
-  insert into public.events (title, event_type, surprise_target, created_by)
-  values ('Dave''s Surprise 30th','birthday',dave,alice) returning id into ev;
+  insert into public.events (title, event_type, created_by)
+  values ('Alice''s birthday plan','birthday',alice) returning id into ev;
 
   if not public.is_event_organizer(ev) then raise exception '❌ ASSERTION FAILED: creator should be organizer'; end if;
   if (select status from public.events where id=ev) <> 'idea' then
@@ -136,27 +136,28 @@ begin
   select count(*) into n from public.event_members where event_id=ev; if n<>0 then raise exception '❌ CARDINAL: Dave must not read member list'; end if;
 
   -- ════════════════════════════════════════════════════════════════════════
-  -- TEST 4 — surprise guard trigger blocks adding the target directly.
-  -- ════════════════════════════════════════════════════════════════════════
+  -- TEST 4 — an organizer may add someone who is NOT their friend.
+  -- (This slot previously asserted the surprise guard. Both that guard and
+  -- the friend requirement were retired together.)
+  -- ══════════════════════════════════════════════════════════════════════
   perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
-  perform public.add_friend_by_handle('Dave#TheCrew');  -- so the friend-check isn't what blocks
-  ok := false;
-  begin
-    insert into public.event_members (event_id,user_id,added_by) values (ev,dave,alice);
-  exception when others then ok := true;
-  end;
-  if not ok then raise exception '❌ ASSERTION FAILED: surprise guard must block adding the target as a member'; end if;
+  insert into public.event_members (event_id,user_id,added_by) values (ev,stranger,alice);
+  if not exists (select 1 from public.event_members where event_id=ev and user_id=stranger) then
+    raise exception '❌ ASSERTION FAILED: an organizer must be able to add a non-friend'; end if;
+  -- Put the fixture back: later tests rely on `stranger` being outside `ev`.
+  delete from public.event_members where event_id=ev and user_id=stranger;
 
   -- ════════════════════════════════════════════════════════════════════════
-  -- TEST 5 — member insert requires organizer AND friend.
+  -- TEST 5 — member insert requires ORGANIZER (friendship no longer needed).
   -- ════════════════════════════════════════════════════════════════════════
   insert into public.events (title, event_type, created_by) values ('Weekend trip','trip',alice) returning id into ev_trip;
 
-  -- organizer Alice cannot add the stranger (not her friend)
-  ok := false;
-  begin insert into public.event_members (event_id,user_id,added_by) values (ev_trip,stranger,alice);
-  exception when others then ok := true; end;
-  if not ok then raise exception '❌ ASSERTION FAILED: organizer must not add a non-friend'; end if;
+  -- Organizer Alice CAN add the stranger now: friendship is no longer a
+  -- precondition for membership.
+  insert into public.event_members (event_id,user_id,added_by) values (ev_trip,stranger,alice);
+  if not exists (select 1 from public.event_members where event_id=ev_trip and user_id=stranger) then
+    raise exception '❌ ASSERTION FAILED: organizer must be able to add a non-friend'; end if;
+  delete from public.event_members where event_id=ev_trip and user_id=stranger;
 
   -- Bob (not a member/organizer of ev_trip) cannot add Carol
   perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
@@ -212,7 +213,7 @@ begin
   -- TEST 9 — CREWS (Type 2: shared, visible groups). Distinct from friend_groups
   -- (Type 1, owner-private). Every member sees the roster; only the owner writes;
   -- and — the cardinal part — being in a crew with someone leaks NOTHING about
-  -- their events. A surprise for a crew member stays invisible to that member.
+  -- their events. An event a crew member isn't in stays invisible to them.
   -- ════════════════════════════════════════════════════════════════════════
   perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
   insert into public.crews (owner_id,name) values (alice,'Roommates') returning id into crew;
@@ -239,20 +240,24 @@ begin
   exception when others then ok := true; end;
   if not ok then raise exception '❌ ASSERTION FAILED: non-owner must not add crew members'; end if;
 
-  -- CARDINAL: a surprise event for Dave, then expand the crew onto it. The
-  -- per-row surprise guard must SKIP Dave, and Dave must still see nothing.
+  -- Expanding a crew adds exactly its current members, and nobody else. The
+  -- crew holds Bob and Dave, so both become members of this event.
   perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
-  insert into public.events (title,event_type,surprise_target,created_by)
-  values ('Daves Surprise (crew)','birthday',dave,alice) returning id into ev_crew;
-  added := public.assign_crew_to_event(crew, ev_crew);   -- Bob added; Dave skipped by guard
-  if added <> 1 then raise exception '❌ CARDINAL: crew expansion must add only Bob, not the target Dave (got %)', added; end if;
-  if exists (select 1 from public.event_members where event_id=ev_crew and user_id=dave) then
-    raise exception '❌ CARDINAL: the surprise target must NOT become an event member via crew expansion'; end if;
+  insert into public.events (title,event_type,created_by)
+  values ('Roommates dinner','dinner',alice) returning id into ev_crew;
+  added := public.assign_crew_to_event(crew, ev_crew);
+  if added <> 2 then raise exception '❌ ASSERTION FAILED: crew expansion must add both crew members (got %)', added; end if;
+  if not exists (select 1 from public.event_members where event_id=ev_crew and user_id=dave) then
+    raise exception '❌ ASSERTION FAILED: Dave is in the crew and must have been added'; end if;
 
-  -- Dave is in the crew WITH Alice, yet sees nothing of Alice''s surprise for him.
+  -- And membership is what grants sight: Dave now reads this event, while
+  -- Carol, who is in neither the crew nor the event, still reads nothing.
   perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
   select count(*) into n from public.events where id=ev_crew;
-  if n <> 0 then raise exception '❌ CARDINAL: crew co-membership must not expose a surprise to its target'; end if;
+  if n <> 1 then raise exception '❌ ASSERTION FAILED: a crew-expanded member must read the event'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
+  select count(*) into n from public.events where id=ev_crew;
+  if n <> 0 then raise exception '❌ VISIBILITY: a non-member must not read the event'; end if;
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 10 — LAST-ORGANIZER GUARD. An event must always keep ≥1 organizer, or
@@ -281,8 +286,8 @@ begin
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 11 — POLLS. Members vote (one each); creator closes; vote privacy is
-  -- own-only while OPEN and full after CLOSE; the surprise target sees nothing.
-  -- Uses the surprise event `ev` (target=Dave; members Bob & Carol).
+  -- own-only while OPEN and full after CLOSE; a non-member sees nothing.
+  -- Uses `ev` (members Bob & Carol; Dave is not a member).
   -- ════════════════════════════════════════════════════════════════════════
   declare
     pmaj uuid; o1 uuid; o2 uuid; w uuid; tie boolean;
@@ -314,10 +319,10 @@ begin
     select count(*) into n from public.poll_votes where poll_id=pmaj and user_id=bob;
     if n <> 1 then raise exception '❌ ASSERTION FAILED: an open poll must show other members'' votes (VIS-7 retired)'; end if;
 
-    -- CARDINAL: the surprise target (Dave) sees no poll at all.
+    -- VISIBILITY: Dave, a non-member, sees no poll at all.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into n from public.polls where id=pmaj;
-    if n <> 0 then raise exception '❌ CARDINAL: surprise target must not see the event''s polls'; end if;
+    if n <> 0 then raise exception '❌ VISIBILITY: a non-member must not see the event''s polls'; end if;
 
     -- Non-creator (Carol) cannot close; creator (Bob) closes -> Pizza wins (2-0).
     perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
@@ -334,7 +339,7 @@ begin
     if n <> 1 then raise exception '❌ ASSERTION FAILED: closed poll must reveal all votes'; end if;
 
     -- CARDINAL: widening votes to every MEMBER must not widen them to everyone.
-    -- Dave is the surprise target and no member of this event.
+    -- Dave is not a member of this event.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into n from public.poll_votes where poll_id=pmaj;
     if n <> 0 then raise exception '❌ CARDINAL: a non-member must not read poll votes'; end if;
@@ -342,8 +347,8 @@ begin
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 12 — COMMENT DISCUSSIONS. Replies (parent_id) form a two-level thread;
-  -- any member may name it; the surprise target sees none of it.
-  -- (Uses the surprise event `ev`: members Bob & Carol, target Dave.)
+  -- any member may name it; a non-member sees none of it.
+  -- (Uses `ev`: members Bob & Carol; Dave is not a member.)
   -- ════════════════════════════════════════════════════════════════════════
   declare
     droot uuid; drep uuid; dcnt int;
@@ -395,16 +400,16 @@ begin
     if (select body from public.comments where id=droot) <> 'Where to eat? (edited)' then
       raise exception '❌ ASSERTION FAILED: the author should be able to edit their own body'; end if;
 
-    -- CARDINAL: the surprise target (Dave) sees no discussion comments or counts.
+    -- VISIBILITY: Dave, a non-member, sees no discussion comments or counts.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into n from public.comments where event_id=ev;
-    if n <> 0 then raise exception '❌ CARDINAL: surprise target must not read the discussion'; end if;
+    if n <> 0 then raise exception '❌ VISIBILITY: a non-member must not read the discussion'; end if;
   end;
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 13 — EVENT HISTORY. Field edits + poll lifecycle are logged by
   -- SECURITY DEFINER code; the log is read-only to members, tamper-proof, and
-  -- invisible to the surprise target. (Uses surprise event `ev`.)
+  -- invisible to non-members. (Uses `ev`.)
   -- ════════════════════════════════════════════════════════════════════════
   declare hn int; hold text; hnew text; hok boolean;
   begin
@@ -435,13 +440,13 @@ begin
         raise exception '❌ TEST13: status change should log the phase label % (got %)', hlabel, hnew; end if;
     end;
 
-    -- Members read history; the surprise target (Dave) reads NONE.
+    -- Members read history; Dave, a non-member, reads NONE.
     perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
     select count(*) into hn from public.event_history where event_id=ev;
     if hn = 0 then raise exception '❌ TEST13: member should read history'; end if;
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into hn from public.event_history where event_id=ev;
-    if hn <> 0 then raise exception '❌ CARDINAL: surprise target must not read history'; end if;
+    if hn <> 0 then raise exception '❌ VISIBILITY: a non-member must not read history'; end if;
 
     -- The log is tamper-proof: a member cannot write to it directly.
     perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
@@ -455,7 +460,7 @@ begin
   -- TEST 14 — SPECIAL POLLS APPLY THEIR WINNER. place -> events.location;
   -- day ('date') -> the date part of starts_at (time-of-day preserved);
   -- 'time' -> the time part, ONLY when a start date exists. Organizer-gated
-  -- creation includes the new 'time' kind. (Uses surprise event `ev`,
+  -- creation includes the new 'time' kind. (Uses `ev`,
   -- organizer Alice, member Bob; plus ev_dinner for the no-date skip case.)
   -- ════════════════════════════════════════════════════════════════════════
   declare
@@ -564,14 +569,12 @@ begin
     select count(*) into ncnt from public.notifications where recipient_id=carol and kind='event_member_added' and event_id=nev;
     if ncnt <> 1 then raise exception '❌ TEST15: Carol should have exactly 1 event_member_added from crew expansion (got %)', ncnt; end if;
 
-    -- CARDINAL: Dave (the surprise target on ev/ev_crew) never receives a
-    -- notification TIED TO THOSE EVENTS. (He's an ordinary crew member
-    -- elsewhere — e.g. Alice's crew_added when she added him in TEST 9 — and
-    -- legitimately gets notified for non-surprise things; only event_id-scoped
-    -- rows for the surprise events themselves are the cardinal concern.)
+    -- VISIBILITY: Dave is not a member of `ev`, so no notification may ever be
+    -- tied to it for him. (He IS a member of ev_crew via TEST 9's crew
+    -- expansion, and is legitimately notified about that one.)
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
-    select count(*) into ncnt from public.notifications where recipient_id=dave and event_id in (ev, ev_crew);
-    if ncnt <> 0 then raise exception '❌ CARDINAL (TEST15): Dave must never be notified about a surprise event (got %)', ncnt; end if;
+    select count(*) into ncnt from public.notifications where recipient_id=dave and event_id = ev;
+    if ncnt <> 0 then raise exception '❌ VISIBILITY (TEST15): a non-member must not be notified about an event (got %)', ncnt; end if;
 
     -- EVENT_CONFIRMED: idea -> planning (no notify) -> confirmed (notify
     -- non-actor members once; actor self-skipped; re-advancing doesn't refire).
@@ -629,7 +632,7 @@ begin
   -- overlap math, the no-ends_at 2h default, the per-event membership gate,
   -- and the cardinal case: Bob's only conflict is DAVE'S SURPRISE EVENT (`ev`,
   -- target Dave) — the boolean still shows true for Bob, but carries no event
-  -- reference, so nothing about the surprise leaks through this channel.
+  -- reference, so nothing about the event leaks through this channel.
   -- ════════════════════════════════════════════════════════════════════════
   declare
     cx uuid; cy uuid; cz_noend uuid; cprobe_in uuid; cprobe_out uuid;
@@ -638,7 +641,7 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
 
     -- X (18:00-20:00) and Y (19:00-21:00) overlap; Bob is in both, plus `ev`
-    -- (the surprise event — Bob is a legitimate member; Dave is its target).
+    -- (`ev` — Bob is a member; Dave is not).
     insert into public.events (title,event_type,created_by,starts_at,ends_at) values
       ('Conflict X','dinner',alice,'2026-09-01T18:00:00Z','2026-09-01T20:00:00Z') returning id into cx;
     insert into public.events (title,event_type,created_by,starts_at,ends_at) values
@@ -689,11 +692,10 @@ begin
     select count(*) into ccnt from public.my_conflicting_events(cy); -- Carol isn't a member of Y
     if ccnt <> 0 then raise exception '❌ TEST16: my_conflicting_events must be empty for a non-member call'; end if;
 
-    -- CARDINAL: Bob's surprise-event membership (`ev`, target Dave) can make
-    -- him show as conflicted to a third party, but that boolean carries no
-    -- event reference — and Dave himself never gets a boolean about Bob at
-    -- all here (he'd have to be a member of the probed event, which as the
-    -- surprise target he structurally can't be).
+    -- Bob's membership of `ev` can make him show as conflicted to a third
+    -- party, but that boolean carries no event reference — and Dave gets no
+    -- boolean about Bob here at all, since he'd have to be a member of the
+    -- probed event and he is not.
     perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
     -- Structural guarantee: the function's return TYPE is boolean, full stop
     -- — it is impossible for it to carry an event id/title.
@@ -714,10 +716,10 @@ begin
   -- non-member payer/participant rejected; a member cannot insert
   -- expense_shares directly (must go through add_expense); only the creator
   -- or an organizer may delete (cascades shares); event_settle_up produces
-  -- the minimum-transaction set and is empty once net-zero; the surprise
-  -- target reads nothing and gets zero settle-up rows. (Reuses `ev`, organizer
-  -- Alice, members Bob & Carol, target Dave; `ev_dinner` for the zero-expense
-  -- case.)
+  -- the minimum-transaction set and is empty once net-zero; a non-member
+  -- reads nothing and gets zero settle-up rows. (Reuses `ev`, organizer
+  -- Alice, members Bob & Carol; Dave is not a member. `ev_dinner` for the
+  -- zero-expense case.)
   -- ════════════════════════════════════════════════════════════════════════
   declare
     xexp uuid; xsum bigint; xcnt int; xok boolean;
@@ -775,8 +777,8 @@ begin
     select count(*) into xcnt from public.event_settle_up(ev_dinner);
     if xcnt <> 0 then raise exception '❌ TEST17: an event with no expenses should settle to zero rows'; end if;
 
-    -- CARDINAL: Dave (surprise target on `ev`) reads nothing and gets zero
-    -- settle-up rows.
+    -- VISIBILITY: Dave is not a member of `ev`, so he reads nothing and gets
+    -- zero settle-up rows.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into xcnt from public.expenses where event_id=ev;
     if xcnt <> 0 then raise exception '❌ CARDINAL (TEST17): Dave must not read expenses'; end if;

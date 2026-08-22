@@ -12,9 +12,6 @@
 ///
 /// Dumb: takes an [Event], an optional attendee count and an onTap.
 ///
-/// A surprise badge is shown when surpriseTarget is set — this is only ever
-/// rendered for people who can already see the event (organizers/members),
-/// never the target, so it leaks nothing (the target never receives the row).
 library;
 
 import 'package:flutter/material.dart';
@@ -80,14 +77,6 @@ class EventCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (event.isSurprise) ...[
-                            const SizedBox(width: 8),
-                            Tooltip(
-                              message: t.eventsSurpriseBadge,
-                              child: Icon(Icons.visibility_off_outlined,
-                                  size: 18, color: AppColors.yellow),
-                            ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 2),

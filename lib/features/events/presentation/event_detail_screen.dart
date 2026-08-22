@@ -143,12 +143,6 @@ class _DetailScaffold extends ConsumerWidget {
                         child: Text(event.title,
                             style: Theme.of(context).textTheme.headlineSmall),
                       ),
-                      if (event.isSurprise)
-                        Padding(
-                          padding: EdgeInsets.only(left: 8),
-                          child: Icon(Icons.visibility_off_outlined,
-                              size: 18, color: AppColors.yellow),
-                        ),
                       // No edit pen. The whole row is still the tap target
                       // for organizers; the icon only cost width that a long
                       // title needed more.

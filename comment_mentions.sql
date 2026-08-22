@@ -8,11 +8,10 @@
 -- found to be a non-member, and silently dropped.
 --
 -- That is deliberately not an error. Erroring would itself be a side channel:
--- "you cannot tag Dave here" tells the author Dave is not in the event, and on
--- a surprise event tells them who the target is. Silence tells them nothing.
+-- "you cannot tag Dave here" tells the author who is and is not in the event.
+-- Silence tells them nothing.
 --
--- The surprise target is covered twice over, as elsewhere: they are not in
--- event_members, and is_event_member is what gates the notify.
+-- A non-member is covered by the same gate: no event_members row, no notify.
 
 -- 1. A new notification kind. The CHECK is rewritten wholesale because Postgres
 --    has no "add value to a check constraint".

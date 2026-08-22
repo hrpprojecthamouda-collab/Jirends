@@ -5,8 +5,8 @@
 ///
 /// Presentation only: it reads the same `eventMembersProvider` the roster
 /// itself uses and derives everything from that already-visible list. No new
-/// query, no visibility logic (the cardinal rule — a surprise target is never
-/// a member, so they never reach this screen at all).
+/// query, no visibility logic (visibility is the database's job — a
+/// non-member never reaches this screen at all).
 library;
 
 import 'package:flutter/material.dart';

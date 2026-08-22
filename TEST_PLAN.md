@@ -15,7 +15,7 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
   used throughout this plan:
   - **Alice** — primary organizer for most scenarios.
   - **Bob, Carol** — ordinary members / friends of Alice.
-  - **Dave** — used as a **surprise target** in the visibility track; also a
+  - **Dave** — used as a **non-member** in the visibility track; also a
     crew co-member elsewhere, to test VIS-6.
   - **Eve** — a **stranger**: not friended by anyone, used for negative
     cases (handle lookup, non-member access attempts).
@@ -36,22 +36,22 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 |---|------|-------|----------|-------|
 | TC-VIS-1 | Non-member can't open an event by guessing its id | As Eve, navigate directly to another user's event URL/route (e.g. via deep link) | "This event isn't available" — indistinguishable from a non-existent event | VIS-1 |
 | TC-VIS-2 | Member sees all event children | As Bob (a member), open Overview/Members/Items/Polls/Comments/Files/History/Expenses tabs | All tabs load data normally | VIS-1 |
-| TC-VIS-3 | Surprise target sees nothing | Alice creates an event with surprise target = Dave. As Dave, check: events list, agenda, direct link to the event | Event never appears anywhere for Dave; direct link shows "unavailable" | VIS-2, US-EVT-1 |
-| TC-VIS-4 | Surprise target can't be force-added | Attempt to add Dave as a member to his own surprise event (e.g. retry via UI if a stale cached picker shows him) | Add fails / Dave never appears in the member list | VIS-2 |
-| TC-VIS-5 | Surprise badge is organizer-only context, not a leak | As Alice (organizer), see the surprise badge/icon on the event. As Bob (plain member), confirm the badge is informational only and doesn't expose anything to Dave | Badge visible to members who can already see the event; nothing reaches Dave | VIS-2 |
+| TC-VIS-3 | Non-member sees nothing | Alice creates an event without Dave. As Dave, check: events list, agenda, direct link to the event | Event never appears anywhere for Dave; direct link shows "unavailable" | VIS-1, US-EVT-1 |
+| TC-VIS-4 | ~~Surprise target can't be force-added~~ **RETIRED with VIS-2** | — | — | — |
+| TC-VIS-5 | ~~Surprise badge~~ **RETIRED with VIS-2** | — | — | — |
 | TC-VIS-6 | Only organizers can add/remove members | As Bob (plain member), confirm no add-member control is visible; attempting the underlying action fails | UI hides the control; any forced attempt is rejected | VIS-3 |
 | TC-VIS-7 | Last-organizer guard | As Alice, sole organizer, try to leave the event or demote yourself | Action blocked with an explanit message | VIS-3, US-MEM-4 |
 | TC-VIS-8 | Second organizer enables the first to leave | Promote Bob to organizer, then have Alice leave | Alice leaves successfully; Bob remains organizer | VIS-3 |
 | TC-VIS-9 | Friend removal is one-sided | Alice removes Bob as a friend | Alice no longer sees Bob as a friend; Bob still sees Alice as his friend | VIS-4, US-FRD-2 |
 | TC-VIS-10 | Selection group members don't see each other | Alice creates a group with Bob and Carol in it | Neither Bob nor Carol can see the group or know they're in it together | VIS-5, US-GRP-1 |
 | TC-VIS-11 | Crew roster is visible to all members | Alice creates a crew, adds Bob and Dave | Bob can open the crew and see both himself and Dave listed | VIS-6, US-CREW-1 |
-| TC-VIS-12 | Crew co-membership doesn't leak surprise events | Alice and Dave are both in a crew. Alice creates a surprise event (target = Dave) and adds the crew to it | Dave still sees nothing of the event despite being Alice's crew-mate | VIS-6 |
+| TC-VIS-12 | Crew co-membership is not event visibility | Alice and Dave are both in a crew. Alice creates an event and does NOT add the crew | Dave sees nothing of the event despite being Alice's crew-mate | VIS-6 |
 | TC-VIS-13 | ~~Open poll hides others' votes~~ **RETIRED with VIS-7** | Bob and Carol vote in an open poll. As Carol, press-and-hold the option Bob backed | Bob is listed among the voters. Ballot secrecy is no longer a requirement | US-POLL-3 |
 | TC-VIS-14 | Votes stay member-only | As a non-member of the event, attempt to read `poll_votes` for it | No rows. Retiring VIS-7 widened visibility to every MEMBER, not to everyone | VIS-1, US-POLL-4 |
 | TC-VIS-15 | Third-party conflict check is boolean-only | As Alice, view Bob's conflict badge on a member tile where Bob's conflicting event is one Alice can't see | Badge shows a generic warning, never the other event's name | VIS-8, US-MEM-6 |
 | TC-VIS-16 | Own conflict check shows full titles | As Bob, view your own conflicting-events list/banner | Full titles of your other overlapping events are shown | VIS-8 |
-| TC-VIS-17 | Surprise target gets no notifications | Add Dave as a crew member to trigger a crew notification; separately, have Alice's surprise event (target Dave) go through member-add/confirm/cancel | Dave gets the crew notification (unrelated to the surprise) but zero notifications tied to the surprise event | VIS-9, US-NOTIF-1/2 |
-| TC-VIS-18 | History is member-scoped | As Dave (surprise target), confirm the event's History tab is unreachable; as Bob (member), confirm it shows entries | Dave: no access. Bob: sees the log | VIS-10, US-HIST-1 |
+| TC-VIS-17 | Non-member gets no event notifications | Add Dave as a crew member to trigger a crew notification; separately, have an event Dave is NOT in go through member-add/confirm/cancel | Dave gets the crew notification but zero notifications tied to that event | VIS-9, US-NOTIF-1/2 |
+| TC-VIS-18 | History is member-scoped | As Dave (non-member), confirm the event's History tab is unreachable; as Bob (member), confirm it shows entries | Dave: no access. Bob: sees the log | VIS-10, US-HIST-1 |
 
 ---
 
@@ -74,7 +74,7 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 | # | Test | Steps | Expected | Story |
 |---|------|-------|----------|-------|
 | TC-EVT-1 | Create each event type | Create one event of each type: trip, dinner, birthday, meetup | All four create successfully with type-appropriate fields (trip = date range, others = single date+time) | US-EVT-1 |
-| TC-EVT-2 | Create with surprise target | Create an event, pick a friend as surprise target | Event created; target excluded from members (see TC-VIS-3/4) | US-EVT-1, VIS-2 |
+| TC-EVT-2 | ~~Create with surprise target~~ **RETIRED with VIS-2** | — | — | — |
 | TC-EVT-3 | Create without required fields | Submit with no title | Blocked with a validation message | US-EVT-1 |
 | TC-EVT-4 | Edit event fields | As organizer, change title/description/times/location | Changes saved and reflected immediately; logged in History | US-EVT-2, US-HIST-1 |
 | TC-EVT-5 | Non-organizer can't edit | As Bob (member), confirm no edit control on event fields | UI doesn't expose editing | VIS-3, US-EVT-2 |
@@ -191,7 +191,7 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 | TC-EXP-8 | Delete by organizer | Organizer deletes someone else's expense | Succeeds | US-EXP-3, VIS-3 |
 | TC-EXP-9 | Delete blocked for unrelated member | A member who isn't the creator or organizer attempts delete | No control / rejected | US-EXP-3, VIS-3 |
 | TC-EXP-10 | No edit, no mark-as-paid | Confirm neither control exists anywhere on an expense or a settle-up row | Neither exists (delete + re-add is the only correction path) | US-EXP-1/2/3 (out of scope note) |
-| TC-EXP-11 | Surprise target excluded | Covered fully in TC-VIS-3 applied to Expenses tab specifically | Dave can't open the tab at all | VIS-2 |
+| TC-EXP-11 | Non-member excluded | Covered fully in TC-VIS-3 applied to the Expenses panel | Dave can't open it at all | VIS-1 |
 
 ---
 
@@ -230,7 +230,7 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 | TC-NOTIF-4 | Event-confirmed notification | Advance an event to confirmed | All other members notified once; the actor doesn't self-notify; advancing further doesn't re-fire it | US-NOTIF-2 |
 | TC-NOTIF-5 | Event-cancelled notification | Cancel an event | All other members notified | US-NOTIF-2 |
 | TC-NOTIF-6 | Mark all read | Open notifications, mark all read | Unread count drops to zero | US-NOTIF-3 |
-| TC-NOTIF-7 | Surprise target excluded | Covered fully in TC-VIS-17 | — | VIS-9 |
+| TC-NOTIF-7 | Non-member excluded | Covered fully in TC-VIS-17 | — | VIS-9 |
 
 ---
 
@@ -239,7 +239,7 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 | # | Test | Steps | Expected | Story |
 |---|------|-------|----------|-------|
 | TC-HOME-1 | Feed shows recent comments/items | Post a comment and add an item on an event you're in | Both appear in the Home feed | US-HOME-1 |
-| TC-HOME-2 | Feed excludes invisible events | Confirm nothing from a surprise event you're the target of appears | Nothing appears | US-HOME-1, VIS-2 |
+| TC-HOME-2 | Feed excludes invisible events | Confirm nothing from an event you are not a member of appears | Nothing appears | US-HOME-1, VIS-1 |
 
 ---
 

@@ -49,7 +49,7 @@ create index if not exists event_members_rsvp_at_idx
 -- solely by notify() (SECURITY DEFINER, no client INSERT policy), so this has
 -- to be a trigger.
 --
--- CARDINAL RULE: the fan-out reads event_members and nothing else. A surprise
+-- VISIBILITY: the fan-out reads event_members and nothing else. A non-member
 -- target is never in that table, so an expense on an event hidden from them
 -- can never produce a notification that reveals it. notify() additionally
 -- refuses to notify an actor about their own action.

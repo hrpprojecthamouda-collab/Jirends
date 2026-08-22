@@ -31,7 +31,7 @@ final class ConflictFailure extends Failure {
 }
 
 /// The action was refused by the database (RLS, a guard trigger, a constraint).
-/// This is the surprise guard, the friend-requirement, the status FK, etc.
+/// This is the status FK, the last-organizer guard, etc.
 final class PermissionFailure extends Failure {
   const PermissionFailure([super.message = 'You don\'t have permission to do that.']);
 }
@@ -82,7 +82,7 @@ Failure mapToFailure(Object error) {
         }
         return const ConflictFailure('That has already been added.');
       case '23503': // foreign_key_violation — bad status/phase, missing ref
-      case '23514': // check_violation — surprise guard, length checks
+      case '23514': // check_violation — length checks, guard triggers
         return PermissionFailure(error.message);
       case '42501': // insufficient_privilege — RLS / SECURITY DEFINER guard
       case 'P0001': // raise_exception (our explicit raises)

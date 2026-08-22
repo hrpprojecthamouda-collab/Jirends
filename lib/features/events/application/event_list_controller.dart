@@ -53,7 +53,6 @@ class CreateEventController extends AsyncNotifier<void> {
     DateTime? startsAt,
     DateTime? endsAt,
     String? location,
-    String? surpriseTarget,
   }) async {
     state = const AsyncLoading();
     String? id;
@@ -65,7 +64,6 @@ class CreateEventController extends AsyncNotifier<void> {
         startsAt: startsAt,
         endsAt: endsAt,
         location: location,
-        surpriseTarget: surpriseTarget,
       );
       id = event.id;
     });

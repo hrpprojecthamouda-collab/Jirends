@@ -10,30 +10,51 @@ date, attachments, members, comments, and reactions. Think Jira stripped down
 to the social essentials — **not** Jira's surface area. Backend is Supabase
 (Postgres + Auth + Realtime + Storage).
 
-## THE CARDINAL RULE — read this twice
+## THE VISIBILITY RULE — read this twice
 
 **Visibility equals membership, and it is enforced in the database, never in
-the client.** A user can see an event (and its comments, reactions,
-attachments) if and only if a row links them to it in `event_members`. This is
-the entire reason the app exists: a "surprise birthday party" must be
-physically unreadable to its target.
+the client.** A user can see an event (and its comments, reactions, polls,
+expenses, attachments) if and only if a row links them to it in
+`event_members`. Everything else in this file is detail; this is the part that
+must not rot.
 
 Therefore:
 
 - **Never** filter events for visibility in Dart/Flutter. The client must
   assume the database already returned only what the user is allowed to see.
-  Hiding a surprise by not rendering it is a bug, not a feature — the data
-  would still be on the device and fetchable.
+  Hiding something by not rendering it is a bug, not a feature — the data would
+  still be on the device and fetchable.
 - Every new table that hangs off an event carries `event_id` and gets an RLS
   policy `using (public.is_event_member(event_id))`. No exceptions.
-- The surprise target is enforced two ways: they're simply not added as a
-  member, **and** a `BEFORE INSERT` trigger refuses to add them. Don't weaken
-  either.
-- Watch the side channels, not just the main screen. No push notification to a
-  surprise target, no "you were added to X" that names the event, no
-  calendar/free-busy view that leaks "you're booked 8–10pm" pointing at a
-  hidden event. When adding any feature, ask: "can the target infer the
-  surprise from this?"
+- `is_event_member` / `is_event_organizer` are `SECURITY DEFINER` on purpose —
+  that is what stops RLS recursion. Call them; never inline a membership
+  subquery into a policy.
+
+### Getting in: two doors, and only two
+
+Membership is not something a client grants itself. It arrives either because
+
+1. an **organizer adds you** (`event_members_insert_organizer`), or
+2. you **open an invite link** and the join RPC adds you.
+
+The join RPC is `SECURITY DEFINER` and therefore bypasses the insert policy —
+possession of a valid, unexpired, unrevoked token *is* its authorization. The
+same is true of `assign_group_to_event` / `assign_crew_to_event`. **So the
+insert policy is not an exhaustive account of who can join.** Read those
+functions too before reasoning about membership.
+
+### Retired: the surprise mechanic (2026-08-21)
+
+The app used to hide an event from one named person (`events.surprise_target`,
+plus two guard triggers), and that was its original reason to exist. It was
+**deliberately removed** — the column, the triggers, and the friend requirement
+on adding members — because it is incompatible with join-by-link: a forwarded
+link admits whoever holds it, and the guard matched on a `profiles.id` that a
+new joiner does not have.
+
+Do not reintroduce per-user content hiding, and do not treat its absence as an
+oversight. If a feature seems to need it, that is a product conversation, not a
+patch.
 
 If a task seems to require enforcing visibility in the client, stop and flag
 it — the design is wrong, not the rule.
@@ -68,7 +89,7 @@ then all the repositories. Keep the app runnable at every commit.
 ## Data model (see `schema.sql` for the source of truth)
 
 - `profiles` — mirror of `auth.users`, auto-created on signup.
-- `events` — the ticket. `surprise_target` (nullable) = the user it's hidden from.
+- `events` — the ticket. Visible to its members (see the visibility rule).
 - `event_members` — membership == visibility. `role` (organizer/member), `rsvp`.
 - `comments`, `reactions` (reactions carry `event_id` for RLS scoping).
 - `attachments` — metadata; bytes in Storage bucket `event-attachments`,
@@ -84,7 +105,7 @@ This is "Jira without the unnecessary parts." Resist rebuilding Jira.
 
 In scope (v1): events with a small fixed status set
 (idea → planning → confirmed → done/cancelled), members,
-comments, reactions, attachments, simple RSVP, the surprise mechanic, expenses
+comments, reactions, attachments, simple RSVP, join-by-link, expenses
 with equal-split settle-up (Tricount-style: log who paid and who it's split
 between; the app computes a minimum-transaction settle-up — read-only, no
 "mark as paid").

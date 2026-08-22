@@ -24,14 +24,14 @@ one operates inside one or more of them.
 | # | Boundary | Rule |
 |---|----------|------|
 | VIS-1 | **Event membership** | A user sees an event (and everything hanging off it — items, comments, reactions, attachments, polls, history, expenses) **iff** a row links them to it in `event_members`. No exceptions, no client-side filtering. |
-| VIS-2 | **Surprise target** | An event may name one member's friend as `surprise_target`. That person is structurally never added to `event_members` — a `BEFORE INSERT` trigger refuses it even if attempted directly. They get zero rows from any query touching that event, including conflict checks and notifications. |
+| VIS-2 | ~~**Surprise target**~~ **RETIRED 2026-08-21** | Was: an event could name one person as `surprise_target` and hide itself from them. Removed along with its two guard triggers and the friend requirement on adding members, because it is incompatible with join-by-link — a forwarded link admits whoever holds it, and the guard matched on a profile id a new joiner does not have. |
 | VIS-3 | **Organizer vs member** | Within an event, only organizers may: add/remove members, edit the event, advance/cancel its status, delete it, create date/time/place polls, delete others' items/comments/expenses. Plain members may RSVP, add items/comments/expenses, vote, and act on their own content. An event must always keep ≥1 organizer (last-organizer guard). |
 | VIS-4 | **Friends are mutual, scoped to the owner** | Friend lists are private to the owner; adding is mutual (no accept step) but **removal is one-sided** — removing someone doesn't remove you from their list. |
 | VIS-5 | **Selection groups are private** | A "group" (Type 1) is a private shortcut owned by one user to batch-add friends to an event. Members are never notified and never see each other or the group itself. |
-| VIS-6 | **Crews are shared/visible** | A "crew" (Type 2) is visible to all its members — everyone sees the full roster — but only the owner can add or remove people. Crew co-membership never leaks event visibility (a crew member can be a surprise target on an event another crew member organizes, and still sees nothing). |
+| VIS-6 | **Crews are shared/visible** | A "crew" (Type 2) is visible to all its members — everyone sees the full roster — but only the owner can add or remove people. Crew co-membership never leaks event visibility (a crew member sees nothing of an event they are not a member of, however they know the organizer). |
 | VIS-7 | ~~**Poll vote privacy**~~ **RETIRED** | Was: while a poll is open, each voter sees only their own vote. Retired by product decision — members press-and-hold a poll option to see who backed it, so votes are readable by any event member at any time. Membership still gates them (`poll_votes_select`). |
 | VIS-8 | **Conflict checks are boolean-only for third parties** | Checking whether *someone else* has a scheduling conflict returns a yes/no flag and never names the conflicting event. Checking your **own** conflicts returns full event titles (you're already a member of both). |
-| VIS-9 | **Notifications are per-recipient** | A user only ever reads their own notification rows; no kind of notification is ever generated for a surprise target about the event they're hidden from. |
+| VIS-9 | **Notifications are per-recipient** | A user only ever reads their own notification rows, and no notification is ever generated for a non-member about an event they cannot see. |
 | VIS-10 | **History is member-scoped, tamper-proof** | The audit log inherits event membership visibility and is written only by server-side triggers — no client insert path. |
 
 ---
@@ -57,7 +57,7 @@ globally unique and is required before I can use the rest of the app.
 
 **US-EVT-1**: As an organizer, I want to create an event with a type (trip,
 dinner, birthday, meetup), title, optional description, date(s)/time,
-location, and an optional surprise target, so that I can start planning.
+location, so that I can start planning.
 
 **US-EVT-2**: As an organizer, I want to edit an event's title, description,
 times, and location after creating it, so that I can correct or refine plans.
@@ -258,7 +258,7 @@ notified about my own actions (no self-notification).
 **US-NOTIF-3**: As a user, I want to mark my notifications as read, so that
 my unread count reflects what I've actually seen.
 
-*(VIS-9 governs: a surprise target never receives any notification tied to
+*(VIS-9 governs: a non-member never receives any notification tied to
 the event they're hidden from.)*
 
 ---

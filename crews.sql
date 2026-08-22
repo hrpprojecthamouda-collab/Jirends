@@ -19,8 +19,8 @@
 -- is in the crew — never anyone's events, RSVPs, or calendar. A crew can be
 -- added to an event only by EXPANDING it into individual event_members rows at
 -- add-time (assign_crew_to_event), a one-time snapshot; the crew is never the
--- permission. rls_tests.sql TEST 9 proves a crew co-member who is a surprise
--- target still sees nothing of the surprise.
+-- permission. rls_tests.sql TEST 9 proves that expanding a crew adds exactly
+-- its members and nobody else.
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Tables
@@ -70,14 +70,12 @@ grant execute on function public.is_crew_member(uuid) to authenticated;
 -- ════════════════════════════════════════════════════════════════════════════
 -- assign_crew_to_event — expand a crew into individual event_members rows.
 -- Modeled on assign_group_to_event: caller must OWN the crew AND be an ORGANIZER
--- of the event. One-time snapshot of the crew's CURRENT members. The
--- surprise-target guard trigger still fires per row; we swallow its
--- check_violation so a crew containing the target simply skips that one row.
+-- of the event. One-time snapshot of the crew's CURRENT members.
 -- Returns the count actually added.
 --
 -- DIFFERENCE from assign_group_to_event: crews do NOT require friendship. Crew
 -- membership is the owner's explicit, mutually-visible choice, so every current
--- member is expanded (still organizer-gated, still surprise-guarded).
+-- member is expanded (still organizer-gated).
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.assign_crew_to_event(p_crew uuid, p_event uuid)
 returns integer
@@ -110,18 +108,14 @@ begin
   for r in
     select cm.user_id from public.crew_members cm where cm.crew_id = p_crew
   loop
-    begin
-      insert into public.event_members (event_id, user_id, role, added_by)
-      values (p_event, r.user_id, 'member', v_me)
-      on conflict (event_id, user_id) do nothing;
-      if found then
-        v_added := v_added + 1;
-      end if;
-    exception
-      when check_violation then
-        -- surprise-target guard (or similar) rejected this row; skip it.
-        continue;
-    end;
+    -- See assign_group_to_event: the per-row exception handler is gone with the
+    -- surprise guard it existed for.
+    insert into public.event_members (event_id, user_id, role, added_by)
+    values (p_event, r.user_id, 'member', v_me)
+    on conflict (event_id, user_id) do nothing;
+    if found then
+      v_added := v_added + 1;
+    end if;
   end loop;
 
   return v_added;
@@ -208,14 +202,12 @@ end$$;
 -- actor/event/crew names are joined live at read time, so e.g. an event
 -- rename is reflected and nothing frozen/stale is stored.
 --
--- Safety (why this can't leak a surprise): event_member_added is written by an
--- AFTER INSERT trigger on event_members — the surprise-target guard
--- (reject_surprise_target_member, schema.sql) already makes it impossible for
--- events.surprise_target to ever become an event_members row, so this trigger
--- can never fire for the target. event_confirmed/event_cancelled fan out to
--- event_members rows only, same guarantee. friend_added/crew_added involve no
--- event data at all. And underneath all of that, RLS SELECT
--- (recipient_id = auth.uid()) is the binding property regardless.
+-- Safety: event_member_added is written by an AFTER INSERT trigger on
+-- event_members, so it can only ever name somebody who has just become a
+-- member. event_confirmed/event_cancelled fan out to event_members rows only,
+-- same guarantee. friend_added/crew_added involve no event data at all. And
+-- underneath all of that, RLS SELECT (recipient_id = auth.uid()) is the
+-- binding property regardless.
 -- ════════════════════════════════════════════════════════════════════════════
 create table public.notifications (
   id           uuid primary key default gen_random_uuid(),

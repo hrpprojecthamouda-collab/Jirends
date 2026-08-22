@@ -8,7 +8,7 @@
 --                     cosmetic over the stored winner.
 --
 -- THE CARDINAL RULE: polls/options/votes carry event_id and are gated by
--- is_event_member(event_id), exactly like comments/items. A surprise target is
+-- is_event_member(event_id), exactly like comments/items. A non-member is
 -- not a member, so they never see an event's polls.
 --
 -- VOTE PRIVACY: while a poll is OPEN a member reads only their OWN vote row
@@ -538,7 +538,7 @@ create policy poll_votes_delete_own on public.poll_votes
 -- `poll_votes_visible_to_all_members`; this file is the record of it.
 --
 -- The cardinal rule is untouched — `is_event_member(event_id)` still gates
--- everything, so a non-member (a surprise target included) reads nothing.
+-- everything, so a non-member reads nothing.
 drop policy if exists poll_votes_select on public.poll_votes;
 create policy poll_votes_select on public.poll_votes
   for select to authenticated

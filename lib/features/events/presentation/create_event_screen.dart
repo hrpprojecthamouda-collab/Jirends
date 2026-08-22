@@ -1,23 +1,16 @@
-/// Create an event — title, type, description, optional date range and location,
-/// and an optional SURPRISE target (a friend the event is hidden from). Status
-/// is set by the DB (the type's first phase). The surprise target is enforced
-/// entirely by the database (the target is never added as a member and can never
-/// read the event); the picker here just sets surprise_target on insert. On
-/// success we pop back to the list, which updates live via the realtime stream.
+/// Create an event — title, type, description, optional date range and
+/// location. Status is set by the DB (the type's first phase). On success we
+/// pop back to the list, which updates live via the realtime stream.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
-import '../../auth/data/profile.dart';
-import '../../groups/presentation/member_picker.dart';
 import '../application/event_list_controller.dart';
 import '../data/event.dart';
-import '../../friends/data/friend_repository.dart';
 
 class CreateEventScreen extends ConsumerStatefulWidget {
   const CreateEventScreen({super.key});
@@ -35,7 +28,6 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   EventType _type = EventType.trip;
   DateTime? _startsAt;
   DateTime? _endsAt;
-  Profile? _surpriseTarget;
 
   @override
   void dispose() {
@@ -110,24 +102,10 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           startsAt: _startsAt,
           endsAt: endsAt,
           location: _location.text.trim(),
-          surpriseTarget: _surpriseTarget?.id,
         );
     if (id != null && mounted) context.pop();
   }
 
-  Future<void> _pickSurprise() async {
-    final t = AppLocalizations.of(context);
-    final friends =
-        await loadForPicker(
-            context, ref.read(friendRepositoryProvider).fetchFriends());
-    if (friends == null || !mounted) return;
-    final picked = await showMemberPicker(
-      context,
-      candidates: friends,
-      emptyMessage: t.groupNoFriendsToAdd,
-    );
-    if (picked != null) setState(() => _surpriseTarget = picked);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -250,34 +228,6 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Surprise target (optional).
-                Text(t.createSurpriseLabel,
-                    style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                _SurpriseField(
-                  target: _surpriseTarget,
-                  onPick: loading ? null : _pickSurprise,
-                  onClear:
-                      loading ? null : () => setState(() => _surpriseTarget = null),
-                ),
-                if (_surpriseTarget != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(
-                      children: [
-                        Icon(Icons.visibility_off_outlined,
-                            size: 16, color: AppColors.yellow),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(t.createSurpriseHint,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: AppColors.inkMuted)),
-                        ),
-                      ],
-                    ),
-                  ),
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: loading ? null : _submit,
@@ -291,49 +241,6 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The surprise-target chooser: a tappable field showing the chosen friend's
-/// handle (or a prompt), with a clear action once one is set.
-class _SurpriseField extends StatelessWidget {
-  const _SurpriseField({
-    required this.target,
-    required this.onPick,
-    required this.onClear,
-  });
-  final Profile? target;
-  final VoidCallback? onPick;
-  final VoidCallback? onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    return InkWell(
-      onTap: onPick,
-      borderRadius: BorderRadius.circular(14),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          prefixIcon: Icon(
-            target == null ? Icons.card_giftcard_outlined : Icons.visibility_off,
-            color: target == null ? null : AppColors.yellow,
-          ),
-          suffixIcon: target != null
-              ? IconButton(
-                  tooltip: t.createSurpriseClear,
-                  icon: const Icon(Icons.close),
-                  onPressed: onClear,
-                )
-              : null,
-        ),
-        child: Text(
-          target?.handle ?? t.createSurpriseChoose,
-          style: target == null
-              ? TextStyle(color: Theme.of(context).hintColor)
-              : null,
         ),
       ),
     );

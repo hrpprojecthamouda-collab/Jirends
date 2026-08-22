@@ -2,7 +2,8 @@
 --
 -- THE CARDINAL RULE: visibility == membership, enforced HERE, never in the
 -- client. A user can read an event and everything hanging off it iff a row in
--- event_members links them to it. The surprise target is excluded two ways:
+-- event_members links them to it. Membership is obtained by an organizer
+-- adding you, or by opening an invite link.
 -- they are simply not added as a member, AND a BEFORE INSERT trigger refuses to
 -- add them. Do not weaken either.
 --
@@ -77,7 +78,6 @@ create table if not exists public.events (
   starts_at       timestamptz,
   ends_at         timestamptz,
   location        text,
-  surprise_target uuid references public.profiles(id) on delete set null,
   created_by      uuid not null references public.profiles(id) on delete cascade,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
@@ -85,7 +85,6 @@ create table if not exists public.events (
 );
 
 create index if not exists events_created_by_idx      on public.events (created_by);
-create index if not exists events_surprise_target_idx on public.events (surprise_target);
 create index if not exists events_type_idx            on public.events (event_type);
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -236,7 +235,7 @@ create index if not exists attachments_event_idx on public.attachments (event_id
 -- location/time edits + poll lifecycle). Written ONLY by SECURITY DEFINER code
 -- (trg_log_event_changes, trg_log_poll_created, and the close/reopen poll RPCs)
 -- via log_event_history(); there is no client write policy, so it is tamper-
--- proof. RLS scopes reads to members → a surprise target sees no history.
+-- proof. RLS scopes reads to members → a non-member sees no history.
 -- (Added in the event_history migration.)
 -- ────────────────────────────────────────────────────────────────────────────
 create table if not exists public.event_history (
@@ -375,62 +374,10 @@ $$;
 revoke all on function public.my_conflicting_events(uuid) from public;
 grant execute on function public.my_conflicting_events(uuid) to authenticated;
 
--- ════════════════════════════════════════════════════════════════════════════
--- SURPRISE GUARD — second line of defence. Refuse to insert the event's
--- surprise_target as a member. (First line: callers simply don't add them.)
--- ════════════════════════════════════════════════════════════════════════════
-create or replace function public.reject_surprise_target_member()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_target uuid;
-begin
-  select surprise_target into v_target from public.events where id = new.event_id;
-  if v_target is not null and v_target = new.user_id then
-    raise exception 'cannot add the surprise target (%) as a member of event %',
-      new.user_id, new.event_id
-      using errcode = 'check_violation';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_reject_surprise_target on public.event_members;
-create trigger trg_reject_surprise_target
-  before insert or update of user_id on public.event_members
-  for each row execute function public.reject_surprise_target_member();
-
--- Also: if someone tries to set surprise_target to an existing member, refuse.
-create or replace function public.reject_surprise_target_existing_member()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if new.surprise_target is not null and exists (
-    select 1 from public.event_members m
-    where m.event_id = new.id and m.user_id = new.surprise_target
-  ) then
-    raise exception 'cannot make existing member (%) the surprise target of event %',
-      new.surprise_target, new.id
-      using errcode = 'check_violation';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_reject_surprise_target_existing on public.events;
-create trigger trg_reject_surprise_target_existing
-  before insert or update of surprise_target on public.events
-  for each row execute function public.reject_surprise_target_existing_member();
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- CREATOR AUTO-MEMBERSHIP — when an event is created, the creator becomes its
--- organizer. (A creator who is also their own surprise target is nonsensical;
+-- organizer. (Runs as DEFINER so it can write the row before any policy applies;
 -- the guard above would reject it, so we skip in that impossible case.)
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.add_creator_as_organizer()
@@ -624,7 +571,7 @@ end;
 $$;
 
 -- One history row per watched field that actually changed (updated_at-only or
--- surprise_target churn logs nothing).
+-- churn on untracked columns logs nothing).
 create or replace function public.log_event_changes()
 returns trigger
 language plpgsql security definer set search_path = public, pg_temp
@@ -718,7 +665,7 @@ alter table public.event_history enable row level security;
 -- ── profiles ────────────────────────────────────────────────────────────────
 -- Profiles are readable by any authenticated user (you must be able to look up
 -- a handle to add a friend, and to render members' names). A profile carries no
--- event data, so this leaks nothing about surprises. You may only write your own.
+-- event data, so this leaks nothing about events. You may only write your own.
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles
   for select to authenticated using (true);
@@ -734,14 +681,11 @@ create policy profiles_insert_own on public.profiles
   for insert to authenticated with check (id = auth.uid());
 
 -- ── events ──────────────────────────────────────────────────────────────────
--- THE core policy. You see an event iff you are a member — OR you are its
--- creator. The creator clause is required so that `INSERT ... RETURNING` works:
--- the creator's organizer membership is added by an AFTER-INSERT trigger, which
--- is not yet visible when RETURNING evaluates this SELECT check. It does NOT
--- weaken the cardinal rule: the surprise target is never the creator (a guard
--- trigger forbids making an existing member the target, and the creator is
--- auto-added as a member), so `created_by = auth.uid()` can never match the
--- target. The surprise target still has no member row and no creator match, so
+-- THE core policy, and the one everything else leans on. You see an event iff
+-- you are a member -- OR you are its creator. The creator clause is required so
+-- that `INSERT ... RETURNING` works: the creator's organizer membership is added
+-- by an AFTER-INSERT trigger, which is not yet visible when RETURNING evaluates
+-- this SELECT check. A non-member has no member row and no creator match, so
 -- this returns nothing for them.
 drop policy if exists events_select_member on public.events;
 create policy events_select_member on public.events
@@ -844,7 +788,7 @@ create trigger trg_sync_expense_share_event
   for each row execute function public.sync_expense_share_event();
 
 -- Guard: payer_id must be an event member at insert time (mirrors the
--- surprise-guard / reject_nonorganizer_typed_poll defensive trigger shape).
+-- reject_nonorganizer_typed_poll defensive trigger shape).
 create or replace function public.reject_nonmember_payer()
 returns trigger
 language plpgsql security definer set search_path = public, pg_temp
