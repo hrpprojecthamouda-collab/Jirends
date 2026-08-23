@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join on Jirends</title>
+<!--
+  The fallback page for an invite link.
+
+  It only ever runs for someone WITHOUT the app: if Jirends is installed and
+  App Links are verified, Android intercepts the URL before a browser is
+  involved and this file is never fetched.
+
+  It therefore shares no code with the app and needs no updating when the app
+  changes. The only things it must agree with are the package name and signing
+  fingerprint in /.well-known/assetlinks.json, and the /join/<token> path.
+
+  Deploy: serve this directory at the domain root so that
+    https://<domain>/.well-known/assetlinks.json  -> assetlinks.json
+    https://<domain>/join/<token>                 -> this file
+  On Netlify/Vercel/Cloudflare Pages a rewrite of /join/* to /join.html does it.
+-->
+<style>
+  :root {
+    --bg: #F2F1E9; --surface: #FEFBF7; --ink: #2E241F;
+    --muted: #7A6759; --brand: #B0552B; --line: #E3DED4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191713; --surface: #232019; --ink: #F0EAE2;
+      --muted: #A9998A; --brand: #D97A45; --line: #332E26;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: var(--bg); color: var(--ink); padding: 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 18px; padding: 32px 28px; max-width: 380px; width: 100%;
+    text-align: center;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 8px; }
+  p { margin: 0 0 20px; color: var(--muted); }
+  .code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.05rem; word-break: break-all; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin: 0 0 20px; user-select: all;
+  }
+  .btn {
+    display: block; background: var(--brand); color: #fff; text-decoration: none;
+    border: 0; border-radius: 12px; padding: 14px 18px; font-size: 1rem;
+    font-weight: 600; width: 100%; cursor: pointer;
+  }
+  .btn.secondary {
+    background: transparent; color: var(--brand);
+    border: 1px solid var(--line); margin-top: 10px;
+  }
+  .hint { font-size: .85rem; margin: 18px 0 0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>You've been invited</h1>
+    <p>Open this invite in Jirends to join the event.</p>
+
+    <div class="code" id="code">—</div>
+
+    <a class="btn" id="open" href="#">Open in Jirends</a>
+    <button class="btn secondary" id="copy">Copy invite code</button>
+
+    <p class="hint">
+      Don't have the app? Install Jirends, then use
+      <strong>Join with a code</strong> on the Events screen.
+    </p>
+  </div>
+
+<script>
+  // The token is the last path segment: /join/<token>
+  var token = location.pathname.split('/').filter(Boolean).pop() || '';
+  document.getElementById('code').textContent = token || 'No code in this link';
+
+  // Try the app directly. Harmless if it isn't installed - the page stays put.
+  var open = document.getElementById('open');
+  open.href = 'jirends://jirends.app/join/' + token;
+
+  document.getElementById('copy').addEventListener('click', function () {
+    navigator.clipboard.writeText(token).then(function () {
+      var b = document.getElementById('copy');
+      b.textContent = 'Copied';
+      setTimeout(function () { b.textContent = 'Copy invite code'; }, 1600);
+    });
+  });
+</script>
+</body>
+</html>

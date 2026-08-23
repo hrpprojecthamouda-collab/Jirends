@@ -381,5 +381,12 @@
   "joinInvalid": "This invite link is no longer valid.",
   "joinFailed": "Couldn't open this invite.",
   "joinBackHome": "Back to Home",
-  "inviteLinkCreated": "Invite link copied"
+  "inviteLinkCreated": "Invite link copied",
+  "joinCodeTitle": "Join with a code",
+  "joinCodeHint": "Paste the invite code someone sent you.",
+  "joinCodeField": "Invite code",
+  "joinCodeAction": "Join",
+  "joinCodeInvalid": "That doesn't look like an invite code.",
+  "eventShareCode": "Join with code: {code}",
+  "@eventShareCode": { "placeholders": { "code": { "type": "String" } } }
 }

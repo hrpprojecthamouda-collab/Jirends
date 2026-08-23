@@ -349,5 +349,12 @@
   "joinInvalid": "El lien mta3 el da3wa ma3adch yekhdem.",
   "joinFailed": "Ma nejemtech neftah el da3wa.",
   "joinBackHome": "Erja3 lel bidaya",
-  "inviteLinkCreated": "El lien tnaskh"
+  "inviteLinkCreated": "El lien tnaskh",
+  "joinCodeTitle": "Odkhol b code",
+  "joinCodeHint": "Losse9 el code eli b3athoulek.",
+  "joinCodeField": "Code",
+  "joinCodeAction": "Odkhol",
+  "joinCodeInvalid": "Hedha mouch code sahih.",
+  "eventShareCode": "Odkhol b code: {code}",
+  "@eventShareCode": { "placeholders": { "code": { "type": "String" } } }
 }

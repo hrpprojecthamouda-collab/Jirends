@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.jirends.jirends",
+      "sha256_cert_fingerprints": [
+        "B6:7E:59:47:1F:A1:1A:50:2F:69:CE:E6:5A:87:29:3D:54:0F:C1:B4:18:37:99:D4:EA:4D:64:97:56:F7:BA:FB"
+      ]
+    }
+  }
+]

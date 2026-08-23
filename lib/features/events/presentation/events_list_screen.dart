@@ -24,6 +24,7 @@ import '../application/event_list_controller.dart';
 import '../data/event.dart';
 import 'widgets/agenda_view.dart';
 import 'widgets/event_card.dart';
+import 'widgets/join_with_code_sheet.dart';
 
 enum _EventsView { list, agenda }
 
@@ -90,6 +91,14 @@ class _EventsListScreenState extends ConsumerState<EventsListScreen> {
           _ViewToggle(
             view: _view,
             onChanged: (v) => setState(() => _view = v),
+          ),
+          // Redeeming an invite by code. Lives here rather than behind the
+          // FAB because someone arriving with a code has no event yet, so the
+          // events list is where they land and look.
+          IconButton(
+            tooltip: t.joinCodeTitle,
+            icon: const Icon(Icons.vpn_key_outlined),
+            onPressed: () => showJoinWithCodeSheet(context),
           ),
           const NotificationBellButton(),
         ],

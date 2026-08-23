@@ -348,5 +348,12 @@
   "joinInvalid": "Ce lien d'invitation n'est plus valable.",
   "joinFailed": "Impossible d'ouvrir cette invitation.",
   "joinBackHome": "Retour à l'accueil",
-  "inviteLinkCreated": "Lien d'invitation copié"
+  "inviteLinkCreated": "Lien d'invitation copié",
+  "joinCodeTitle": "Rejoindre avec un code",
+  "joinCodeHint": "Colle le code d'invitation qu'on t'a envoyé.",
+  "joinCodeField": "Code d'invitation",
+  "joinCodeAction": "Rejoindre",
+  "joinCodeInvalid": "Ça ne ressemble pas à un code d'invitation.",
+  "eventShareCode": "Rejoins avec le code : {code}",
+  "@eventShareCode": { "placeholders": { "code": { "type": "String" } } }
 }

@@ -271,7 +271,13 @@ class _ShareButtonState extends ConsumerState<_ShareButton> {
               final token = await _mint();
               if (token == null || !mounted) return;
               await SharePlus.instance.share(ShareParams(
+                // Link AND code. The link is the nice path once a domain
+                // serves App Links; today most messengers will not linkify a
+                // custom scheme, and an in-app browser handed one reports
+                // "webpage not available". The code is plain text, so it
+                // survives every client.
                 text: '${t.eventShareText(widget.event.title)}\n'
+                    '${t.eventShareCode(token)}\n'
                     '${inviteLink(token)}',
               ));
             },
