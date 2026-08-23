@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required in the MAIN manifest, not just the debug one. Flutter's
+         generated debug/ and profile/ manifests declare INTERNET for tooling
+         (hot reload), which makes debug builds work and quietly leaves RELEASE
+         builds with no network at all - every Supabase call fails and the app
+         is unusable. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="jirends"
         android:name="${applicationName}"
@@ -20,9 +27,39 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Hand incoming deep links to Flutter (and therefore
+                 go_router) instead of cold-starting on the default route.
+                 This must live inside <activity>: in <application> it is
+                 silently ignored, the intent-filter still opens the app, and
+                 the URL is dropped - which looks exactly like a routing bug. -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!-- Invite links: jirends://join/<token>.
+                 A custom scheme needs no domain and no verification, so it
+                 works for a sideloaded build today. It only ever opens if the
+                 app is already installed, and most chat apps render it as
+                 plain text rather than a tappable link.
+
+                 The https form is the upgrade: add a second intent-filter with
+                 android:autoVerify="true" and android:host="jirends.app" once
+                 that domain serves /.well-known/assetlinks.json naming this
+                 package and the SHA-256 of the RELEASE signing key. Then the
+                 same link opens the app for people who have it and a web page
+                 for people who don't. Nothing else in the app changes -
+                 inviteLink() in event_detail_screen.dart is the only place
+                 that builds the URL. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="jirends" android:host="jirends.app"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

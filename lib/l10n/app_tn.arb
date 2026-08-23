@@ -339,5 +339,15 @@
   "@activityVotedManyPlain": { "placeholders": { "count": { "type": "int" }, "event": { "type": "String" } } },
   "notificationUnread": "Mahouch ma9ri",
   "notificationCommentMention": "{who} 3ayyatlek fi {event}",
-  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } }
+  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } },
+  "joinTitle": "Odkhol lel event",
+  "joinSignInPrompt": "3andek da3wa l event fi Jirends. Connecti-rou7 bech todkhol.",
+  "joinSignInAction": "Connecti bech todkhol",
+  "joinInvitedTo": "M3AZOUM L",
+  "joinAction": "Odkhol",
+  "joinOpen": "Iftah — rak deja fih",
+  "joinInvalid": "El lien mta3 el da3wa ma3adch yekhdem.",
+  "joinFailed": "Ma nejemtech neftah el da3wa.",
+  "joinBackHome": "Erja3 lel bidaya",
+  "inviteLinkCreated": "El lien tnaskh"
 }

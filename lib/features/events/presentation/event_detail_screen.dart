@@ -24,6 +24,7 @@ import '../application/event_detail_controller.dart';
 import '../application/event_list_controller.dart';
 import '../application/event_status_controller.dart';
 import '../data/event.dart';
+import '../data/invite_repository.dart';
 import '../data/event_member.dart';
 import '../data/event_phase.dart';
 import 'tabs/expenses_tab.dart';
@@ -209,33 +210,82 @@ class _FollowButton extends ConsumerWidget {
   }
 }
 
-/// Deep link to the event. It only opens for people who are already members
-/// (RLS), so sharing it is a convenience, not a public share.
-String _eventLink(Event event) => 'https://jirends.app/events/${event.id}';
+/// An invite link for a token.
+///
+/// The host and path are deliberately the ones a real domain would use, so the
+/// https upgrade is a one-word change here and one extra intent-filter: the
+/// path go_router matches (/join/:token) stays identical. The https form is the
+/// one to switch to once a domain serves /.well-known/assetlinks.json — at
+/// which point it opens the app for people who have it AND shows a web page to
+/// people who do not. Only this function changes that day.
+String inviteLink(String token) => 'jirends://jirends.app/join/$token';
 
 /// Share — promoted out of the old overflow menu to a first-class button.
-/// Long-press copies the link instead of opening the share sheet.
-class _ShareButton extends StatelessWidget {
+///
+/// Tapping mints a fresh invite token and shares it; long-press copies it
+/// instead. Minting per share, rather than reusing one link forever, means a
+/// leaked link can be revoked without invalidating everyone else's.
+class _ShareButton extends ConsumerStatefulWidget {
   const _ShareButton({required this.event});
   final Event event;
 
   @override
+  ConsumerState<_ShareButton> createState() => _ShareButtonState();
+}
+
+class _ShareButtonState extends ConsumerState<_ShareButton> {
+  bool _busy = false;
+
+  Future<String?> _mint() async {
+    setState(() => _busy = true);
+    try {
+      return await ref
+          .read(inviteRepositoryProvider)
+          .createInvite(widget.event.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(messageForError(e))));
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final link = _eventLink(event);
     return IconButton(
       tooltip: t.eventShare,
-      icon: const Icon(Icons.ios_share),
-      onPressed: () => SharePlus.instance
-          .share(ShareParams(text: '${t.eventShareText(event.title)}\n$link')),
-      onLongPress: () async {
-        await Clipboard.setData(ClipboardData(text: link));
-        if (context.mounted) {
-          ScaffoldMessenger.of(context)
-            ..clearSnackBars()
-            ..showSnackBar(SnackBar(content: Text(t.eventLinkCopied)));
-        }
-      },
+      icon: _busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.ios_share),
+      onPressed: _busy
+          ? null
+          : () async {
+              final token = await _mint();
+              if (token == null || !mounted) return;
+              await SharePlus.instance.share(ShareParams(
+                text: '${t.eventShareText(widget.event.title)}\n'
+                    '${inviteLink(token)}',
+              ));
+            },
+      onLongPress: _busy
+          ? null
+          : () async {
+              final token = await _mint();
+              if (token == null || !mounted) return;
+              await Clipboard.setData(ClipboardData(text: inviteLink(token)));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(SnackBar(content: Text(t.inviteLinkCreated)));
+            },
     );
   }
 }
@@ -269,13 +319,6 @@ class _ToolboxMenu extends ConsumerWidget {
               title: t.detailTabHistory,
               child: HistoryTab(eventId: event.id),
             );
-          case 'copy':
-            await Clipboard.setData(ClipboardData(text: _eventLink(event)));
-            if (context.mounted) {
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(SnackBar(content: Text(t.eventLinkCopied)));
-            }
           case 'delete':
             await _confirmDelete(context, ref);
         }
@@ -298,14 +341,6 @@ class _ToolboxMenu extends ConsumerWidget {
           ]),
         ),
         const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'copy',
-          child: Row(children: [
-            const Icon(Icons.link, size: 18),
-            const SizedBox(width: 12),
-            Text(t.eventCopyLink),
-          ]),
-        ),
         if (canDelete)
           PopupMenuItem(
             value: 'delete',

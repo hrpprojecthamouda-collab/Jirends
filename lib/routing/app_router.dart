@@ -31,6 +31,7 @@ import '../features/events/data/comment.dart';
 import '../features/events/presentation/events_list_screen.dart';
 import '../features/events/presentation/create_event_screen.dart';
 import '../features/events/presentation/event_detail_screen.dart';
+import '../features/events/presentation/join_event_screen.dart';
 import '../features/events/presentation/discussion_screen.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/groups/presentation/groups_screen.dart';
@@ -59,6 +60,10 @@ class AppRoutes {
   static const settings = '/settings';
 
   static const createEvent = '/events/new';
+
+  /// Redeeming an invite link. Path: /join/:token
+  static String joinEvent(String token) => '/join/$token';
+  static const joinPrefix = '/join/';
 
   /// Detail route for one event. Path: /events/:id
   static String eventDetail(String id) => '/events/$id';
@@ -95,13 +100,18 @@ String? redirectFor({
   required String? userId,
   required AsyncValue<Profile?> profile,
   required String location,
+  String? pendingInvite,
 }) {
   final loggingIn =
       location == AppRoutes.signIn || location == AppRoutes.signUp;
+  final joining = location.startsWith(AppRoutes.joinPrefix);
 
-  // 1. No session -> must authenticate.
+  // 1. No session -> must authenticate. /join is allowed through: the screen
+  //    itself stashes the token and offers to sign in, which is the only way
+  //    the token survives the round trip. Bouncing straight to /sign-in would
+  //    swallow it and the link would appear to do nothing.
   if (userId == null) {
-    return loggingIn ? null : AppRoutes.signIn;
+    return (loggingIn || joining) ? null : AppRoutes.signIn;
   }
 
   // 2. Signed in. Is the profile we are holding actually this user's?
@@ -128,12 +138,34 @@ String? redirectFor({
     return onOnboarding ? null : AppRoutes.onboarding;
   }
 
-  // 4. Fully set up -> keep them out of auth/onboarding/splash pages.
+  // 4. Signed in with a handle, and an invite was stashed before signing in:
+  //    resume it. This is what makes "tap link -> sign in -> land in the
+  //    event" work rather than dumping the user on Home having lost the token.
+  if (pendingInvite != null && !joining) {
+    return AppRoutes.joinEvent(pendingInvite);
+  }
+
+  // 5. Fully set up -> keep them out of auth/onboarding/splash pages.
   if (loggingIn || onOnboarding || location == AppRoutes.splash) {
     return AppRoutes.home;
   }
   return null;
 }
+
+/// A token captured from a link that arrived before the user was signed in.
+/// Set by the join screen, consumed by [redirectFor] and cleared once the join
+/// screen has it in hand. In memory only: if the app is killed mid-sign-in the
+/// user taps the link again, which is a fair trade for not persisting a
+/// membership-granting token to disk.
+class PendingInvite extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? token) => state = token;
+}
+
+final pendingInviteProvider =
+    NotifierProvider<PendingInvite, String?>(PendingInvite.new);
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Rebuild routing decisions whenever auth or the profile changes.
@@ -148,6 +180,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       userId: ref.read(currentSessionProvider)?.user.id,
       profile: ref.read(myProfileProvider),
       location: state.matchedLocation,
+      pendingInvite: ref.read(pendingInviteProvider),
     ),
     routes: [
       // ── Auth / onboarding / splash (outside the shell) ──────────────────
@@ -157,6 +190,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: AppRoutes.onboarding,
           builder: (_, _) => const OnboardingScreen()),
+
+      // Invite links. Top-level (not in the shell) and reachable while signed
+      // OUT — the screen stashes the token and offers to sign in, which is how
+      // the token survives the round trip.
+      GoRoute(
+        path: '/join/:token',
+        builder: (_, state) =>
+            JoinEventScreen(token: state.pathParameters['token']!),
+      ),
 
       // ── Profile + Settings: top-level overlays, not branches ───────────
       GoRoute(

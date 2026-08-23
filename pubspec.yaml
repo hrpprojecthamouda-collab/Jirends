@@ -49,6 +49,12 @@ dependencies:
   google_fonts: ^8.1.0
   # Remembers the chosen colour palette across launches (see app_palette.dart).
   shared_preferences: ^2.3.2
+  # Invite deep links. Already in the tree via supabase_flutter (it uses the
+  # same plugin for OAuth callbacks, and that is precisely why Flutter's own
+  # deep-link handling never sees our intents - see core/util/deep_links.dart).
+  # Declared explicitly rather than leaned on transitively, so a supabase
+  # upgrade that drops it breaks the build instead of the feature.
+  app_links: ^7.0.0
 
 dev_dependencies:
   flutter_test:

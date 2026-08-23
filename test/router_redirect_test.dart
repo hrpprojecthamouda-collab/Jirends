@@ -155,4 +155,63 @@ void main() {
       );
     });
   });
+
+  group('invite links', () {
+    test('/join is reachable while signed OUT', () {
+      // The screen stashes the token and offers to sign in. Bouncing to
+      // /sign-in here would swallow the token and the link would look dead.
+      expect(
+        redirectFor(
+            userId: null,
+            profile: const AsyncData(null),
+            location: '/join/abc123'),
+        isNull,
+      );
+    });
+
+    test('a stashed invite is resumed once signed in with a handle', () {
+      expect(
+        redirectFor(
+            userId: _me,
+            profile: const AsyncData(_settled),
+            location: '/',
+            pendingInvite: 'abc123'),
+        '/join/abc123',
+      );
+    });
+
+    test('resuming does not loop once already on the join screen', () {
+      expect(
+        redirectFor(
+            userId: _me,
+            profile: const AsyncData(_settled),
+            location: '/join/abc123',
+            pendingInvite: 'abc123'),
+        isNull,
+      );
+    });
+
+    test('onboarding still wins over a stashed invite', () {
+      // A user with no handle cannot be a useful member yet, so finish
+      // onboarding first; the token survives in the provider.
+      expect(
+        redirectFor(
+            userId: _me,
+            profile: const AsyncData(_noHandle),
+            location: '/join/abc123',
+            pendingInvite: 'abc123'),
+        '/onboarding',
+      );
+    });
+
+    test('no stashed invite leaves normal navigation alone', () {
+      expect(
+        redirectFor(
+            userId: _me,
+            profile: const AsyncData(_settled),
+            location: '/events'),
+        isNull,
+      );
+    });
+  });
 }

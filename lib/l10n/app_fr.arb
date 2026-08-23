@@ -338,5 +338,15 @@
   "@activityVotedManyPlain": { "placeholders": { "count": { "type": "int" }, "event": { "type": "String" } } },
   "notificationUnread": "Non lu",
   "notificationCommentMention": "{who} t’a mentionné dans {event}",
-  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } }
+  "@notificationCommentMention": { "placeholders": { "who": { "type": "String" }, "event": { "type": "String" } } },
+  "joinTitle": "Rejoindre l'événement",
+  "joinSignInPrompt": "Tu es invité à un événement sur Jirends. Connecte-toi pour rejoindre.",
+  "joinSignInAction": "Se connecter pour rejoindre",
+  "joinInvitedTo": "TU ES INVITÉ À",
+  "joinAction": "Rejoindre",
+  "joinOpen": "Ouvrir — tu en fais déjà partie",
+  "joinInvalid": "Ce lien d'invitation n'est plus valable.",
+  "joinFailed": "Impossible d'ouvrir cette invitation.",
+  "joinBackHome": "Retour à l'accueil",
+  "inviteLinkCreated": "Lien d'invitation copié"
 }

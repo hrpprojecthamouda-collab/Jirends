@@ -9,6 +9,7 @@ import 'core/supabase/supabase_providers.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/palette_controller.dart';
 import 'l10n/app_localizations.dart';
+import 'core/util/deep_links.dart';
 import 'routing/app_router.dart';
 
 Future<void> main() async {
@@ -29,11 +30,27 @@ Future<void> main() async {
   runApp(const ProviderScope(child: JirendsApp()));
 }
 
-class JirendsApp extends ConsumerWidget {
+class JirendsApp extends ConsumerStatefulWidget {
   const JirendsApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JirendsApp> createState() => _JirendsAppState();
+}
+
+class _JirendsAppState extends ConsumerState<JirendsApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Invite links arrive through app_links (see deep_links.dart for why the
+    // manifest flag alone is not enough). Start after the first frame so the
+    // router exists before a cold-start link tries to navigate.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(deepLinkServiceProvider).start();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final locale = ref.watch(localeProvider);
     // Watching the palette is what rebuilds the whole tree when the user picks
