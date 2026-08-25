@@ -99,29 +99,26 @@ Helper SQL functions `is_event_member(uuid)` and `is_event_organizer(uuid)` are
 `SECURITY DEFINER` on purpose — that's what stops RLS recursion. Don't inline
 membership subqueries into policies; call the functions.
 
-## Branches
+## One branch
 
-Two, and they are not "old" and "new" — they are two products.
+`master`, and only `master`. There is no chat or messaging in this app and no
+branch exploring one — a `feature/chat` branch existed briefly on 2026-08-22 and
+was deleted the same day, unused.
 
-| Branch | What it is |
-|---|---|
-| `master` | **The app.** No chat, no messaging. This is the default and where work happens unless told otherwise. |
-| `feature/chat` | An experiment adding chat/messaging — between individuals and inside crews. Branched from `master` at e03010f. |
+That is a decision, not a gap. Everyone using this app is already in a group
+chat about the event — the invite link gets pasted into one. A second
+conversation surface would compete with the one that has everyone's history,
+and it would cost a permanent architectural tax: today visibility has exactly
+one oracle, `is_event_member(event_id)`, and DMs plus crew chat would add two
+more axes to reason about forever. It also drags in push notifications and
+user-to-user moderation, the latter being a Play Store review blocker.
 
-If you are asked for a feature and no branch is named, it belongs on `master`.
-Do not add chat, direct messages or conversation UI to `master` — the absence
-is the point of that branch, not a gap waiting to be filled. Comments on an
-event are NOT chat; they already exist and stay on both branches.
+Comments on an event are NOT chat. They exist, they stay, and they already
+carry threads, reactions and @mentions.
 
-**The database is shared.** Both branches point at the same Supabase project, so
-a migration applied while working on `feature/chat` is live for `master` too.
-Keep chat schema strictly ADDITIVE — new tables, new policies, new functions —
-so `master`, which never queries them, is unaffected. The moment chat needs to
-ALTER an existing table, policy or function, stop: that change cannot be
-branch-local, and it needs a Supabase branch or a deliberate decision instead.
-
-Merging `feature/chat` back is a product decision, not a chore. It may never
-happen, and `master` must stay shippable on its own regardless.
+If chat comes back it is a product conversation with a real trigger behind it
+(people repeatedly wanting to say something and having nowhere to put it,
+most likely in crews) — not a patch.
 
 ## Scope discipline
 
