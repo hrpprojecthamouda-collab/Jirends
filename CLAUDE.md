@@ -99,6 +99,30 @@ Helper SQL functions `is_event_member(uuid)` and `is_event_organizer(uuid)` are
 `SECURITY DEFINER` on purpose — that's what stops RLS recursion. Don't inline
 membership subqueries into policies; call the functions.
 
+## Branches
+
+Two, and they are not "old" and "new" — they are two products.
+
+| Branch | What it is |
+|---|---|
+| `master` | **The app.** No chat, no messaging. This is the default and where work happens unless told otherwise. |
+| `feature/chat` | An experiment adding chat/messaging — between individuals and inside crews. Branched from `master` at e03010f. |
+
+If you are asked for a feature and no branch is named, it belongs on `master`.
+Do not add chat, direct messages or conversation UI to `master` — the absence
+is the point of that branch, not a gap waiting to be filled. Comments on an
+event are NOT chat; they already exist and stay on both branches.
+
+**The database is shared.** Both branches point at the same Supabase project, so
+a migration applied while working on `feature/chat` is live for `master` too.
+Keep chat schema strictly ADDITIVE — new tables, new policies, new functions —
+so `master`, which never queries them, is unaffected. The moment chat needs to
+ALTER an existing table, policy or function, stop: that change cannot be
+branch-local, and it needs a Supabase branch or a deliberate decision instead.
+
+Merging `feature/chat` back is a product decision, not a chore. It may never
+happen, and `master` must stay shippable on its own regardless.
+
 ## Scope discipline
 
 This is "Jira without the unnecessary parts." Resist rebuilding Jira.
