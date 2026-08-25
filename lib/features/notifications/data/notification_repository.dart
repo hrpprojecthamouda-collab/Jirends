@@ -1,5 +1,5 @@
 /// NotificationRepository — the caller's own notifications, joined to the
-/// actor profile and the related event title / crew name. RLS scopes every
+/// actor profile and the related event title. RLS scopes every
 /// read to recipient_id = auth.uid(); there is no client write path beyond
 /// marking your own rows read (the DB triggers do all the writing).
 library;
@@ -24,8 +24,7 @@ class NotificationRepository {
           .from('notifications')
           .select('*, '
               'actor:profiles!notifications_actor_id_fkey(*), '
-              'event:events!notifications_event_id_fkey(id,title), '
-              'crew:crews!notifications_crew_id_fkey(id,name)')
+              'event:events!notifications_event_id_fkey(id,title)')
           .eq('recipient_id', uid)
           .order('created_at', ascending: false);
       return rows.map(AppNotification.fromJson).toList();

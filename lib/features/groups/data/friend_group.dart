@@ -1,7 +1,7 @@
 /// FriendGroup — a Type-1 selection group (mirrors public.friend_groups). These
 /// are OWNER-PRIVATE: a personal shortcut for adding several friends to an event
 /// at once. Members never know they're in one. A group is NEVER a permission —
-/// it expands into individual event_members rows at add-time. Contrast [Crew]
+/// it expands into individual event_members rows at add-time.
 /// (Type 2, shared & visible).
 library;
 

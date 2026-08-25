@@ -1,7 +1,7 @@
 /// Members tab — the member roster with role + RSVP. Your own row gets an RSVP
-/// control. Organizers get a menu to add a friend / group / crew (via the
-/// already-shipped assign_* RPCs) and to remove members. RLS enforces all of
-/// this regardless of what the UI shows.
+/// control. Organizers get a menu to add a friend or a group (the latter via
+/// assign_group_to_event) and to remove members. RLS enforces all of this
+/// regardless of what the UI shows.
 library;
 
 import 'package:flutter/material.dart';
@@ -19,7 +19,6 @@ import '../../data/event_member.dart';
 import '../event_detail_screen.dart';
 import '../../../profile/presentation/user_avatar.dart';
 import '../../../groups/data/group_repository.dart';
-import '../../../groups/data/crew_repository.dart';
 import '../../../friends/data/friend_repository.dart';
 
 class MembersTab extends ConsumerStatefulWidget {
@@ -411,7 +410,7 @@ class _RsvpPicker extends StatelessWidget {
   }
 }
 
-/// Organizer add menu: friend / group / crew. A FAB that opens a bottom sheet
+/// Organizer add menu: friend or group. A FAB that opens a bottom sheet
 /// with the three add options.
 class _AddMenu extends ConsumerWidget {
   const _AddMenu({required this.event, required this.members});
@@ -448,11 +447,6 @@ class _AddMenu extends ConsumerWidget {
               title: Text(t.addGroup),
               onTap: () => Navigator.of(context).pop('group'),
             ),
-            ListTile(
-              leading: const Icon(Icons.groups_2_outlined),
-              title: Text(t.addCrew),
-              onTap: () => Navigator.of(context).pop('crew'),
-            ),
           ],
         ),
       ),
@@ -463,8 +457,6 @@ class _AddMenu extends ConsumerWidget {
         await _addFriend(context, ref);
       case 'group':
         await _addGroup(context, ref);
-      case 'crew':
-        await _addCrew(context, ref);
     }
   }
 
@@ -536,32 +528,8 @@ class _AddMenu extends ConsumerWidget {
     }
   }
 
-  Future<void> _addCrew(BuildContext context, WidgetRef ref) async {
-    final t = AppLocalizations.of(context);
-    final crews =
-        await loadForPicker(
-            context, ref.read(crewRepositoryProvider).fetchCrews());
-    if (crews == null || !context.mounted) return;
-    final picked = await showGenericPicker(
-      context,
-      labels: {for (final c in crews) c.id: c.name},
-      emptyMessage: t.noCrewsToAdd,
-    );
-    if (picked != null) {
-      final beforeIds = members.map((m) => m.userId).toSet();
-      final added = await ref
-          .read(memberActionsControllerProvider.notifier)
-          .addCrew(event.id, picked);
-      if (added != null && context.mounted) {
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(SnackBar(content: Text(t.addedToEvent(added))));
-        await _warnIfConflictedAmongNewMembers(context, ref, beforeIds);
-      }
-    }
-  }
 
-  /// Bulk adds (group/crew) don't return WHO was added, only a count — diff
+  /// A bulk group add doesn't return WHO was added, only a count — diff
   /// the member list before/after to find the new arrivals, then run the same
   /// boolean-only conflict check on each.
   Future<void> _warnIfConflictedAmongNewMembers(

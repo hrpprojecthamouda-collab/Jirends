@@ -137,7 +137,6 @@ class _NotificationTile extends StatelessWidget {
 
   (IconData, Color) _iconFor(NotificationKind k) => switch (k) {
         NotificationKind.friendAdded => (Icons.person_add_alt_1, AppColors.primary),
-        NotificationKind.crewAdded => (Icons.groups_outlined, AppColors.violet),
         NotificationKind.eventMemberAdded => (Icons.event_available, AppColors.blue),
         NotificationKind.eventConfirmed => (Icons.check_circle_outline, AppColors.teal),
         NotificationKind.eventCancelled => (Icons.cancel_outlined, AppColors.coral),
@@ -152,7 +151,6 @@ class _NotificationTile extends StatelessWidget {
     final who = n.actor?.handle ?? '…';
     return switch (n.kindEnum) {
       NotificationKind.friendAdded => t.notificationFriendAdded(who),
-      NotificationKind.crewAdded => t.notificationCrewAdded(who, n.crew?.name ?? ''),
       NotificationKind.eventMemberAdded =>
         t.notificationEventMemberAdded(who, n.event?.title ?? ''),
       NotificationKind.eventCancelled =>

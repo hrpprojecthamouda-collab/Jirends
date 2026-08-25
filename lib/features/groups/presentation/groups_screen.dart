@@ -1,11 +1,13 @@
-/// Groups tab — two distinct concepts in one screen:
-///   1. Selection groups (Type 1) — private to you; a shortcut to add several
-///      friends to an event at once. Members never know they're in one.
-///   2. Crews (Type 2) — shared, visible circles; every member sees the roster.
+/// Groups tab — your private selection groups.
 ///
-/// Both are dumb lists reading providers. Neither grants event visibility — that
-/// stays with event_members (the cardinal rule); these only expand into members
-/// at add-time, which happens on the event side.
+/// A group is a shortcut for adding several friends to an event at once;
+/// members never know they are in one. There used to be a second concept here
+/// (crews: shared, visible circles) and it was removed — two tables and two
+/// RLS models for one user-facing idea.
+///
+/// A dumb list reading a provider. It grants no event visibility — that stays
+/// with event_members; a group only expands into members at add-time, which
+/// happens on the event side.
 library;
 
 import 'package:flutter/material.dart';
@@ -18,7 +20,6 @@ import '../../../routing/app_router.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../notifications/presentation/widgets/notification_bell_button.dart';
 import '../../profile/presentation/profile_avatar_button.dart';
-import '../application/crew_list_controller.dart';
 import '../application/group_list_controller.dart';
 import 'group_dialogs.dart';
 
@@ -29,11 +30,9 @@ class GroupsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final groups = ref.watch(groupListProvider);
-    final crews = ref.watch(crewListProvider);
 
     // Surface action errors (create/delete/etc.) from either controller.
     ref.listen(groupActionsControllerProvider, (_, n) => _maybeError(context, n));
-    ref.listen(crewActionsControllerProvider, (_, n) => _maybeError(context, n));
 
     return Scaffold(
       appBar: AppBar(
@@ -82,45 +81,6 @@ class GroupsScreen extends ConsumerWidget {
                   ),
           ),
 
-          const SizedBox(height: 16),
-
-          // ── Crews (Type 2) ─────────────────────────────────────────────
-          _SectionHeader(
-            title: t.crewsSection,
-            hint: t.crewsHint,
-            onAdd: () => showCreateNameDialog(
-              context,
-              title: t.crewCreate,
-              label: t.crewName,
-              onSubmit: (name) =>
-                  ref.read(crewActionsControllerProvider.notifier).create(name),
-            ),
-          ),
-          crews.when(
-            loading: () => const _Loading(),
-            error: (e, _) => _Error(messageForError(e)),
-            data: (list) => list.isEmpty
-                ? _EmptyLine(t.crewsEmpty)
-                : Column(
-                    children: [
-                      for (final c in list)
-                        Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppColors.surfaceHi,
-                              foregroundColor: AppColors.primary,
-                              child: Icon(Icons.groups_2_outlined),
-                            ),
-                            title: Text(c.name),
-                            trailing: Icon(Icons.chevron_right,
-                                color: AppColors.inkMuted),
-                            onTap: () =>
-                                context.push(AppRoutes.crewDetail(c.id)),
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
         ],
       ),
     );

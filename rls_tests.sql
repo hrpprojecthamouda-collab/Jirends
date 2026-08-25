@@ -25,7 +25,7 @@ declare
   dave  uuid := '44444444-4444-4444-4444-444444444444';  -- never a member of ev
   stranger uuid := '55555555-5555-5555-5555-555555555555';
   clash uuid := '99999999-9999-9999-9999-999999999999';
-  ev uuid; ev_trip uuid; ev_dinner uuid; grp uuid; crew uuid; ev_crew uuid;
+  ev uuid; ev_trip uuid; ev_dinner uuid; grp uuid;
   n int; res uuid; ok boolean; added int;
 begin
   -- Impersonation is done inline with set_config(...,true): each call sets the
@@ -210,54 +210,9 @@ begin
   if not ok then raise exception '❌ ASSERTION FAILED: users must not write phase config'; end if;
 
   -- ════════════════════════════════════════════════════════════════════════
-  -- TEST 9 — CREWS (Type 2: shared, visible groups). Distinct from friend_groups
-  -- (Type 1, owner-private). Every member sees the roster; only the owner writes;
-  -- and — the cardinal part — being in a crew with someone leaks NOTHING about
-  -- their events. An event a crew member isn't in stays invisible to them.
-  -- ════════════════════════════════════════════════════════════════════════
-  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
-  insert into public.crews (owner_id,name) values (alice,'Roommates') returning id into crew;
-  insert into public.crew_members (crew_id,user_id,added_by) values (crew,bob,alice);
-  insert into public.crew_members (crew_id,user_id,added_by) values (crew,dave,alice);
-
-  -- Member Bob can read the crew AND the full roster (sees Dave) — defining Type-2 trait.
-  perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
-  select count(*) into n from public.crews where id=crew;
-  if n <> 1 then raise exception '❌ ASSERTION FAILED: crew member Bob must be able to read the crew'; end if;
-  select count(*) into n from public.crew_members where crew_id=crew;
-  if n <> 2 then raise exception '❌ ASSERTION FAILED: crew member Bob must see the full roster (expected 2, got %)', n; end if;
-
-  -- Stranger (not a member) sees neither the crew nor its roster.
-  perform set_config('request.jwt.claims', json_build_object('sub',stranger::text,'role','authenticated')::text, true);
-  select count(*) into n from public.crews where id=crew;
-  if n <> 0 then raise exception '❌ ASSERTION FAILED: non-member must not read the crew'; end if;
-  select count(*) into n from public.crew_members where crew_id=crew;
-  if n <> 0 then raise exception '❌ ASSERTION FAILED: non-member must not read the crew roster'; end if;
-
-  -- Non-owner member Bob cannot add or remove crew members (owner-only writes).
-  ok := false;
-  begin insert into public.crew_members (crew_id,user_id,added_by) values (crew,carol,bob);
-  exception when others then ok := true; end;
-  if not ok then raise exception '❌ ASSERTION FAILED: non-owner must not add crew members'; end if;
-
-  -- Expanding a crew adds exactly its current members, and nobody else. The
-  -- crew holds Bob and Dave, so both become members of this event.
-  perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
-  insert into public.events (title,event_type,created_by)
-  values ('Roommates dinner','dinner',alice) returning id into ev_crew;
-  added := public.assign_crew_to_event(crew, ev_crew);
-  if added <> 2 then raise exception '❌ ASSERTION FAILED: crew expansion must add both crew members (got %)', added; end if;
-  if not exists (select 1 from public.event_members where event_id=ev_crew and user_id=dave) then
-    raise exception '❌ ASSERTION FAILED: Dave is in the crew and must have been added'; end if;
-
-  -- And membership is what grants sight: Dave now reads this event, while
-  -- Carol, who is in neither the crew nor the event, still reads nothing.
-  perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
-  select count(*) into n from public.events where id=ev_crew;
-  if n <> 1 then raise exception '❌ ASSERTION FAILED: a crew-expanded member must read the event'; end if;
-  perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
-  select count(*) into n from public.events where id=ev_crew;
-  if n <> 0 then raise exception '❌ VISIBILITY: a non-member must not read the event'; end if;
+  -- TEST 9 — RETIRED. Crews (Type 2, shared visible circles) were removed
+  -- on 2026-08-23; friend_groups (TEST 6) covers what remains.
+  -- ══════════════════════════════════════════════════════════════════════
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 10 — LAST-ORGANIZER GUARD. An event must always keep ≥1 organizer, or
@@ -521,12 +476,12 @@ begin
 
   -- ════════════════════════════════════════════════════════════════════════
   -- TEST 15 — NOTIFICATIONS. The first PER-RECIPIENT table: a user only ever
-  -- reads their own rows. Covers friend_added (mutual fan-out), crew_added
-  -- (self-add skipped), event_member_added (individual + crew-expansion
+  -- reads their own rows. Covers friend_added (mutual fan-out)
+  -- (self-add skipped), event_member_added (individual + group-expansion
   -- fan-out; creator's own auto-add skipped), event_confirmed (fires once,
   -- not on intermediate planning, not on re-advance, actor self-skipped),
-  -- event_cancelled, the cardinal rule, and cross-user RLS isolation.
-  -- (Reuses ev/ev_crew/crew/alice/bob/carol/dave from earlier tests.)
+  -- event_cancelled, visibility, and cross-user RLS isolation.
+  -- (Reuses ev/grp/alice/bob/carol/dave from earlier tests.)
   -- ════════════════════════════════════════════════════════════════════════
   declare
     nev uuid; ncnt int; nok boolean;
@@ -542,12 +497,6 @@ begin
     select count(*) into ncnt from public.notifications where recipient_id=alice and kind='friend_added' and actor_id=bob;
     if ncnt < 1 then raise exception '❌ TEST15: Alice should see >=1 friend_added from Bob (got %)', ncnt; end if;
 
-    -- CREW_ADDED: Bob was added to `crew` earlier (TEST 9); self-add (Dave,
-    -- added by Alice -- not himself) does NOT apply here, so just check Bob.
-    perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
-    select count(*) into ncnt from public.notifications where recipient_id=bob and kind='crew_added' and crew_id=crew;
-    if ncnt <> 1 then raise exception '❌ TEST15: Bob should see 1 crew_added (got %)', ncnt; end if;
-
     -- EVENT_MEMBER_ADDED: creator's own auto-add must not self-notify; Bob's
     -- direct add to `ev` (TEST 3) must notify him exactly once.
     perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
@@ -557,21 +506,20 @@ begin
     select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_member_added' and event_id=ev;
     if ncnt <> 1 then raise exception '❌ TEST15: Bob should see 1 event_member_added on ev (got %)', ncnt; end if;
 
-    -- Crew-expansion fan-out on a FRESH event: exactly 1 per recipient.
+    -- Group-expansion fan-out on a FRESH event: exactly 1 per recipient.
     perform set_config('request.jwt.claims', json_build_object('sub',alice::text,'role','authenticated')::text, true);
-    insert into public.crew_members (crew_id,user_id,added_by) values (crew,carol,alice) on conflict do nothing;
-    insert into public.events (title,event_type,created_by) values ('Notif crew dinner','dinner',alice) returning id into nev;
-    perform public.assign_crew_to_event(crew, nev);
+    insert into public.friend_group_members (group_id,friend_id) values (grp,carol) on conflict do nothing;
+    insert into public.events (title,event_type,created_by) values ('Notif group dinner','dinner',alice) returning id into nev;
+    perform public.assign_group_to_event(grp, nev);
     perform set_config('request.jwt.claims', json_build_object('sub',bob::text,'role','authenticated')::text, true);
     select count(*) into ncnt from public.notifications where recipient_id=bob and kind='event_member_added' and event_id=nev;
-    if ncnt <> 1 then raise exception '❌ TEST15: Bob should have exactly 1 event_member_added from crew expansion (got %)', ncnt; end if;
+    if ncnt <> 1 then raise exception '❌ TEST15: Bob should have exactly 1 event_member_added from group expansion (got %)', ncnt; end if;
     perform set_config('request.jwt.claims', json_build_object('sub',carol::text,'role','authenticated')::text, true);
     select count(*) into ncnt from public.notifications where recipient_id=carol and kind='event_member_added' and event_id=nev;
-    if ncnt <> 1 then raise exception '❌ TEST15: Carol should have exactly 1 event_member_added from crew expansion (got %)', ncnt; end if;
+    if ncnt <> 1 then raise exception '❌ TEST15: Carol should have exactly 1 event_member_added from group expansion (got %)', ncnt; end if;
 
-    -- VISIBILITY: Dave is not a member of `ev`, so no notification may ever be
-    -- tied to it for him. (He IS a member of ev_crew via TEST 9's crew
-    -- expansion, and is legitimately notified about that one.)
+    -- VISIBILITY: Dave is not a member of `ev`, so no notification may ever
+    -- be tied to it for him.
     perform set_config('request.jwt.claims', json_build_object('sub',dave::text,'role','authenticated')::text, true);
     select count(*) into ncnt from public.notifications where recipient_id=dave and event_id = ev;
     if ncnt <> 0 then raise exception '❌ VISIBILITY (TEST15): a non-member must not be notified about an event (got %)', ncnt; end if;

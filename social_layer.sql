@@ -258,7 +258,7 @@ create policy fgm_delete_owner on public.friend_group_members
 -- mechanic, so an organizer can now add anyone they can name.
 --
 -- IMPORTANT: this policy is NOT an exhaustive account of who can join an event.
--- assign_group_to_event and assign_crew_to_event are SECURITY DEFINER and
+-- assign_group_to_event is SECURITY DEFINER and
 -- bypass it entirely, doing their own ownership/organizer checks; the
 -- invite-link RPC does the same, with possession of a valid token as its
 -- authorization. Read those functions too before reasoning about membership.
@@ -280,6 +280,6 @@ begin
 end$$;
 
 -- NOTE: the `notifications` table (and its triggers, incl. notify_friend_added
--- on this table) lives in crews.sql, not here — notifications.crew_id
--- references public.crews(id), which doesn't exist until crews.sql is applied
--- (apply order: schema.sql -> social_layer.sql -> event_types.sql -> crews.sql).
+-- on this table) lives in notifications.sql, not here, so the whole
+-- notification system stays in one file (apply order: schema.sql ->
+-- social_layer.sql -> event_types.sql -> notifications.sql).

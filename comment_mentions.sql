@@ -18,7 +18,7 @@
 alter table public.notifications drop constraint if exists notifications_kind_check;
 alter table public.notifications add constraint notifications_kind_check
   check (kind in (
-    'friend_added','crew_added','event_member_added',
+    'friend_added','event_member_added',
     'event_cancelled','event_confirmed','expense_added',
     'comment_mention'));
 

@@ -1,5 +1,5 @@
 /// Shared dialogs for the Groups feature — a simple "enter a name" dialog used
-/// to create both selection groups and crews, plus a confirm-delete helper.
+/// to create a selection group, plus a confirm-delete helper.
 library;
 
 import 'package:flutter/material.dart';

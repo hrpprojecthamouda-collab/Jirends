@@ -36,7 +36,6 @@ import '../features/events/presentation/discussion_screen.dart';
 import '../features/friends/presentation/friends_screen.dart';
 import '../features/groups/presentation/groups_screen.dart';
 import '../features/groups/presentation/group_detail_screen.dart';
-import '../features/groups/presentation/crew_detail_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/home/presentation/splash_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
@@ -73,9 +72,8 @@ class AppRoutes {
   static String discussion(String eventId, String rootId) =>
       '/events/$eventId/discussion/$rootId';
 
-  /// Detail routes within the Groups branch.
+  /// Detail route within the Groups branch.
   static String groupDetail(String id) => '/groups/group/$id';
-  static String crewDetail(String id) => '/groups/crew/$id';
 }
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -254,7 +252,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.friends,
                 builder: (_, _) => const FriendsScreen()),
           ]),
-          // Groups (+ group/crew detail as pushes within this branch)
+          // Groups (+ group detail as a push within this branch)
           StatefulShellBranch(routes: [
             GoRoute(
               path: AppRoutes.groups,
@@ -264,11 +262,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: 'group/:id',
                   builder: (context, state) =>
                       GroupDetailScreen(groupId: state.pathParameters['id']!),
-                ),
-                GoRoute(
-                  path: 'crew/:id',
-                  builder: (context, state) =>
-                      CrewDetailScreen(crewId: state.pathParameters['id']!),
                 ),
               ],
             ),

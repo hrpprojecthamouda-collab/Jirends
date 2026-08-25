@@ -4,7 +4,7 @@
 -- you (event_members_insert_organizer). This one is a token: possession of a
 -- valid, unexpired, unrevoked invite IS the authorization, which is why the
 -- join RPC is SECURITY DEFINER and bypasses that policy entirely. Modelled on
--- assign_crew_to_event, which does the same thing for a different reason.
+-- assign_group_to_event, which does the same thing for a different reason.
 --
 -- VISIBILITY: unchanged. is_event_member() is still the only oracle, and a
 -- non-member still reads nothing. What a token grants is MEMBERSHIP; sight

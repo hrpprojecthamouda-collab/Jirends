@@ -28,7 +28,7 @@ one operates inside one or more of them.
 | VIS-3 | **Organizer vs member** | Within an event, only organizers may: add/remove members, edit the event, advance/cancel its status, delete it, create date/time/place polls, delete others' items/comments/expenses. Plain members may RSVP, add items/comments/expenses, vote, and act on their own content. An event must always keep ≥1 organizer (last-organizer guard). |
 | VIS-4 | **Friends are mutual, scoped to the owner** | Friend lists are private to the owner; adding is mutual (no accept step) but **removal is one-sided** — removing someone doesn't remove you from their list. |
 | VIS-5 | **Selection groups are private** | A "group" (Type 1) is a private shortcut owned by one user to batch-add friends to an event. Members are never notified and never see each other or the group itself. |
-| VIS-6 | **Crews are shared/visible** | A "crew" (Type 2) is visible to all its members — everyone sees the full roster — but only the owner can add or remove people. Crew co-membership never leaks event visibility (a crew member sees nothing of an event they are not a member of, however they know the organizer). |
+| VIS-6 | ~~**Crews are shared/visible**~~ **RETIRED 2026-08-23** | Crews (Type 2, shared visible circles) were removed. `friend_groups` keeps the part that mattered — adding several people to an event in one tap — and two group concepts with divergent visibility rules were not worth two tables, two RLS models and two screens. |
 | VIS-7 | ~~**Poll vote privacy**~~ **RETIRED** | Was: while a poll is open, each voter sees only their own vote. Retired by product decision — members press-and-hold a poll option to see who backed it, so votes are readable by any event member at any time. Membership still gates them (`poll_votes_select`). |
 | VIS-8 | **Conflict checks are boolean-only for third parties** | Checking whether *someone else* has a scheduling conflict returns a yes/no flag and never names the conflicting event. Checking your **own** conflicts returns full event titles (you're already a member of both). |
 | VIS-9 | **Notifications are per-recipient** | A user only ever reads their own notification rows, and no notification is ever generated for a non-member about an event they cannot see. |
@@ -86,9 +86,9 @@ are already members — it's a convenience, not a public share).
 so that they can see and participate in the event. (Requires: the person is
 already my friend.)
 
-**US-MEM-2**: As an organizer, I want to add a whole selection group or crew
+**US-MEM-2**: As an organizer, I want to add a whole selection group
 at once, so that I don't have to add people one by one. This is a one-time
-snapshot at add-time — adding someone to the group/crew later does not
+snapshot at add-time — adding someone to the group later does not
 retroactively add them to past events.
 
 **US-MEM-3**: As an organizer, I want to remove a member, so that I can
@@ -226,7 +226,7 @@ them as a candidate for events. This only affects my own list (VIS-4).
 
 ---
 
-## 11. Groups (private) & Crews (shared)
+## 11. Groups (private)
 
 **US-GRP-1**: As a user, I want to create a private selection group of my
 friends, so that I can quickly add the same set of people to multiple
@@ -235,20 +235,12 @@ events. (Group members are never notified and never see each other.)
 **US-GRP-2**: As a group's owner, I want to add/remove friends from it and
 rename or delete it, so that I can keep it current.
 
-**US-CREW-1**: As a user, I want to create a crew and add people to it by
-handle (not limited to friends), so that I have a shared, visible circle
-(e.g. roommates) that everyone in it can see.
 
-**US-CREW-2**: As a crew's owner, I want to add/remove members and
-rename/delete the crew, so that I can manage it. (Only the owner writes;
-every member reads the full roster.)
-
----
 
 ## 12. Notifications
 
 **US-NOTIF-1**: As a user, I want to be notified when someone adds me as a
-friend, adds me to a crew, or adds me to an event, so that I know what
+friend or adds me to an event, so that I know what
 changed without checking manually.
 
 **US-NOTIF-2**: As a user, I want to be notified when an event I'm in is

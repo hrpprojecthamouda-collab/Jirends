@@ -63,7 +63,7 @@ begin
   for v_member in
     select user_id from public.event_members where event_id = new.event_id
   loop
-    perform public.notify(v_member, auth.uid(), 'expense_added', new.event_id, null);
+    perform public.notify(v_member, auth.uid(), 'expense_added', new.event_id);
   end loop;
   return new;
 end;

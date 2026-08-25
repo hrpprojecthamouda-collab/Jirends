@@ -7,7 +7,7 @@
 /// than either behaviour on its own.
 ///
 /// Clearing cached data is deliberately not this widget's job: every per-user
-/// provider (events, friends, crews, groups, notifications, the activity feed,
+/// provider (events, friends, groups, notifications, the activity feed,
 /// the profile) already watches currentSessionProvider, so they all re-subscribe
 /// the moment the session drops. The router's redirect guard does the rest.
 library;

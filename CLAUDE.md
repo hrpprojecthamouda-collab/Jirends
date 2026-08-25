@@ -39,7 +39,7 @@ Membership is not something a client grants itself. It arrives either because
 
 The join RPC is `SECURITY DEFINER` and therefore bypasses the insert policy —
 possession of a valid, unexpired, unrevoked token *is* its authorization. The
-same is true of `assign_group_to_event` / `assign_crew_to_event`. **So the
+same is true of `assign_group_to_event`. **So the
 insert policy is not an exhaustive account of who can join.** Read those
 functions too before reasoning about membership.
 
@@ -109,7 +109,7 @@ That is a decision, not a gap. Everyone using this app is already in a group
 chat about the event — the invite link gets pasted into one. A second
 conversation surface would compete with the one that has everyone's history,
 and it would cost a permanent architectural tax: today visibility has exactly
-one oracle, `is_event_member(event_id)`, and DMs plus crew chat would add two
+one oracle, `is_event_member(event_id)`, and DMs plus group chat would add two
 more axes to reason about forever. It also drags in push notifications and
 user-to-user moderation, the latter being a Play Store review blocker.
 
@@ -118,7 +118,23 @@ carry threads, reactions and @mentions.
 
 If chat comes back it is a product conversation with a real trigger behind it
 (people repeatedly wanting to say something and having nowhere to put it,
-most likely in crews) — not a patch.
+most likely in friend groups) — not a patch.
+
+## Retired: crews (2026-08-23)
+
+There used to be TWO group concepts. `friend_groups` (owner-private selection
+shortcut) survives. `crews` (shared, visible circles where every member saw the
+roster) were removed — two tables, two RLS models, two screens and two
+notification paths for one user-facing idea.
+
+`friend_groups` keeps the part that mattered: `assign_group_to_event` still
+expands a group into individual `event_members` rows in one tap. What was lost
+is only the shared roster. Do not reintroduce a second group type; if a group
+needs to be visible to its members, that is a change to `friend_groups`, not a
+new table beside it.
+
+`crews.sql` became `notifications.sql` — the notification system lived in the
+same file and was never crew-specific.
 
 ## Scope discipline
 
@@ -177,7 +193,7 @@ depend on tables the earlier ones create:
 1. `schema.sql` — events, members, comments, reactions, attachments.
 2. `social_layer.sql` — friends, groups, notifications.
 3. `event_types.sql` — the creation templates.
-4. `crews.sql` — shared/visible "crew" groups (Type 2).
+4. `notifications.sql` — the per-recipient notification table and triggers.
 5. `polls.sql` — per-event polls, majority / weighted-random resolution.
 6. `polls_multivote.sql` — widens the vote key so a member can back several
    options in one poll, and adds the distinct-voter count RPC.

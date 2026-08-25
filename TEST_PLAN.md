@@ -16,7 +16,6 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
   - **Alice** — primary organizer for most scenarios.
   - **Bob, Carol** — ordinary members / friends of Alice.
   - **Dave** — used as a **non-member** in the visibility track; also a
-    crew co-member elsewhere, to test VIS-6.
   - **Eve** — a **stranger**: not friended by anyone, used for negative
     cases (handle lookup, non-member access attempts).
 - The debug account switcher (Settings, dev builds only) is the fast path to
@@ -44,13 +43,13 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 | TC-VIS-8 | Second organizer enables the first to leave | Promote Bob to organizer, then have Alice leave | Alice leaves successfully; Bob remains organizer | VIS-3 |
 | TC-VIS-9 | Friend removal is one-sided | Alice removes Bob as a friend | Alice no longer sees Bob as a friend; Bob still sees Alice as his friend | VIS-4, US-FRD-2 |
 | TC-VIS-10 | Selection group members don't see each other | Alice creates a group with Bob and Carol in it | Neither Bob nor Carol can see the group or know they're in it together | VIS-5, US-GRP-1 |
-| TC-VIS-11 | Crew roster is visible to all members | Alice creates a crew, adds Bob and Dave | Bob can open the crew and see both himself and Dave listed | VIS-6, US-CREW-1 |
-| TC-VIS-12 | Crew co-membership is not event visibility | Alice and Dave are both in a crew. Alice creates an event and does NOT add the crew | Dave sees nothing of the event despite being Alice's crew-mate | VIS-6 |
+| TC-VIS-11 | ~~Crew roster visible to all members~~ **RETIRED with VIS-6** | — | — | — |
+| TC-VIS-12 | ~~Crew co-membership is not event visibility~~ **RETIRED with VIS-6** | — | — | — |
 | TC-VIS-13 | ~~Open poll hides others' votes~~ **RETIRED with VIS-7** | Bob and Carol vote in an open poll. As Carol, press-and-hold the option Bob backed | Bob is listed among the voters. Ballot secrecy is no longer a requirement | US-POLL-3 |
 | TC-VIS-14 | Votes stay member-only | As a non-member of the event, attempt to read `poll_votes` for it | No rows. Retiring VIS-7 widened visibility to every MEMBER, not to everyone | VIS-1, US-POLL-4 |
 | TC-VIS-15 | Third-party conflict check is boolean-only | As Alice, view Bob's conflict badge on a member tile where Bob's conflicting event is one Alice can't see | Badge shows a generic warning, never the other event's name | VIS-8, US-MEM-6 |
 | TC-VIS-16 | Own conflict check shows full titles | As Bob, view your own conflicting-events list/banner | Full titles of your other overlapping events are shown | VIS-8 |
-| TC-VIS-17 | Non-member gets no event notifications | Add Dave as a crew member to trigger a crew notification; separately, have an event Dave is NOT in go through member-add/confirm/cancel | Dave gets the crew notification but zero notifications tied to that event | VIS-9, US-NOTIF-1/2 |
+| TC-VIS-17 | Non-member gets no event notifications | Have an event Dave is NOT in go through member-add / confirm / cancel | Dave receives zero notifications tied to that event | VIS-9, US-NOTIF-1/2 |
 | TC-VIS-18 | History is member-scoped | As Dave (non-member), confirm the event's History tab is unreachable; as Bob (member), confirm it shows entries | Dave: no access. Bob: sees the log | VIS-10, US-HIST-1 |
 
 ---
@@ -95,7 +94,7 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 | TC-MEM-1 | Add a friend as member | As organizer, add Bob (already a friend) | Bob appears in the member list; Bob gets a notification (US-NOTIF-1) | US-MEM-1 |
 | TC-MEM-2 | Can't add a non-friend | Try to add Eve (not a friend) | Not offered as a candidate, or rejected if attempted | US-MEM-1, VIS-4 |
 | TC-MEM-3 | Add a selection group | Add a group containing Bob and Carol | Both added in one action; notified individually | US-MEM-2 |
-| TC-MEM-4 | Add a crew | Add a crew containing Bob and Dave | Both added in one action | US-MEM-2 |
+| TC-MEM-4 | ~~Add a crew~~ **RETIRED with VIS-6** | — | — | — |
 | TC-MEM-5 | Late group addition doesn't retro-expose | Add Carol to a group after that group was already used to populate an event | Carol is not retroactively added to the earlier event | US-MEM-2, VIS-5 |
 | TC-MEM-6 | Remove a member | As organizer, remove Bob | Bob loses access to the event immediately | US-MEM-3 |
 | TC-MEM-7 | Leave as a non-last organizer / as a member | As Bob (plain member), leave the event | Bob's own membership removed; event continues | US-MEM-4 |
@@ -206,15 +205,15 @@ Test cases are numbered `TC-<area>-<n>` and link back to one or more
 
 ---
 
-## 11. Groups & Crews
+## 11. Groups
 
 | # | Test | Steps | Expected | Story |
 |---|------|-------|----------|-------|
 | TC-GRP-1 | Create group | Create a private group, add Bob and Carol | Group created with both members | US-GRP-1 |
 | TC-GRP-2 | Rename/delete group | Rename, then delete the group | Both succeed; deleting doesn't remove the friends themselves | US-GRP-2 |
 | TC-GRP-3 | Group members blind to each other | Covered fully in TC-VIS-10 | — | VIS-5 |
-| TC-CREW-1 | Create crew, add by handle | Create a crew, add a non-friend by handle | Succeeds (crews aren't friend-limited) | US-CREW-1 |
-| TC-CREW-2 | All members see roster | Covered fully in TC-VIS-11 | — | VIS-6 |
+| TC-CREW-1 | ~~Create crew~~ **RETIRED with VIS-6** | — | — | — |
+| TC-CREW-2 | ~~All members see roster~~ **RETIRED with VIS-6** | — | — | — |
 | TC-CREW-3 | Only owner writes | As a non-owner crew member, attempt to add/remove someone | Blocked | US-CREW-2, VIS-6 |
 | TC-CREW-4 | Rename/delete crew | Rename, then delete the crew | Both succeed; all members lose access | US-CREW-2 |
 

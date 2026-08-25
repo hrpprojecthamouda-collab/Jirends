@@ -1,11 +1,10 @@
 /// Event-detail controllers: members (live), the type's phases, and an action
-/// notifier for RSVP / add member / add group / add crew / remove. Adding a
-/// group or crew reuses the existing Group/Crew repositories' assign_* RPCs.
+/// notifier for RSVP / add member / add group / remove. Adding a group reuses
+/// the existing GroupRepository's assign_group_to_event RPC.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../groups/data/crew_repository.dart';
 import '../../groups/data/group_repository.dart';
 import '../data/event.dart';
 import '../data/event_detail_repository.dart';
@@ -78,18 +77,6 @@ class MemberActionsController extends AsyncNotifier<void> {
     return state.hasError ? null : added;
   }
 
-  /// Expand a crew onto the event. Returns the count added.
-  Future<int?> addCrew(String eventId, String crewId) async {
-    state = const AsyncLoading();
-    int? added;
-    state = await AsyncValue.guard(() async {
-      added = await ref
-          .read(crewRepositoryProvider)
-          .assignCrewToEvent(crewId, eventId);
-    });
-    if (!state.hasError) ref.invalidate(memberConflictsProvider(eventId));
-    return state.hasError ? null : added;
-  }
 }
 
 final memberActionsControllerProvider =

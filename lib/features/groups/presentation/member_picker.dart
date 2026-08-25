@@ -35,7 +35,7 @@ Future<T?> loadForPicker<T>(BuildContext context, Future<T> data) async {
   }
 }
 
-/// A generic id→label picker (e.g. choose a group or crew). Returns the chosen
+/// A generic id→label picker (e.g. choose a group). Returns the chosen
 /// id, or null if dismissed. Shows [emptyMessage] when there are none.
 Future<String?> showGenericPicker(
   BuildContext context, {

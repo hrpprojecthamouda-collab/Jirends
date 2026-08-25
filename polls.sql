@@ -1,4 +1,4 @@
--- polls.sql — polls on an event (apply AFTER crews.sql).
+-- polls.sql — polls on an event (apply AFTER notifications.sql).
 --
 -- A poll belongs to an event; members vote (one vote each); the poll's creator
 -- closes it. Two resolution modes:

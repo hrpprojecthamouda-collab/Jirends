@@ -1,6 +1,6 @@
 -- event_types.sql — per-type phases & fields as DATA.
 -- Apply order: schema.sql -> social_layer.sql -> event_types.sql (this file)
--- -> crews.sql -> polls.sql.
+-- -> notifications.sql -> polls.sql.
 --
 -- Event types are DEVELOPER-defined (the event_type enum). Their workflows
 -- (phases) and type-specific fields live in seed tables here — NOT in Dart and
