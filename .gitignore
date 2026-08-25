@@ -61,3 +61,6 @@ lib/core/env/dev_accounts.dart
 # Generated localizations (flutter gen-l10n from lib/l10n/*.arb). The ARB files
 # are the source of truth and ARE tracked; the generated Dart is not.
 lib/l10n/app_localizations*.dart
+
+# Personal scratch backlog — notes to self, not project documentation.
+Jirends.txt
